@@ -1,0 +1,654 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>ktn_analysis.coarse_ktn_analysis &#8212; ktn_analysis 2019 documentation</title>
+    <link rel="stylesheet" href="_static/zerovm.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="ktn_analysis: Analyzing Kinetic Transition Networks" href="index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="ktn_analysis: Analyzing Kinetic Transition Networks"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ktn_analysis 2019 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="module-ktn_analysis.coarse_ktn_analysis">
+<span id="ktn-analysis-coarse-ktn-analysis"></span><h1>ktn_analysis.coarse_ktn_analysis<a class="headerlink" href="#module-ktn_analysis.coarse_ktn_analysis" title="Permalink to this headline">¶</a></h1>
+<p>Main Python script to estimate and analyse a coarse transition network
+Usage:
+python coarse_ktn_analysis.py &lt;n_nodes&gt; &lt;n_edges&gt; &lt;n_comms&gt;
+requires 4x input data files</p>
+<p>Daniel J. Sharpe
+Sep 2019</p>
+<dl class="class">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn">
+<em class="property">class </em><code class="descclassname">ktn_analysis.coarse_ktn_analysis.</code><code class="descname">Analyse_coarse_ktn</code><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self.  See help(type(self)) for accurate signature.</p>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.calc_eig_all">
+<em class="property">static </em><code class="descname">calc_eig_all</code><span class="sig-paren">(</span><em>M</em>, <em>k=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn.calc_eig_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.calc_eig_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.calc_eig_iram">
+<em class="property">static </em><code class="descname">calc_eig_iram</code><span class="sig-paren">(</span><em>M</em>, <em>k</em>, <em>which_eigs='SM'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn.calc_eig_iram"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.calc_eig_iram" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.calc_t">
+<code class="descname">calc_t</code><span class="sig-paren">(</span><em>tau</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn.calc_t"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.calc_t" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.calc_tlin">
+<code class="descname">calc_tlin</code><span class="sig-paren">(</span><em>tau</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn.calc_tlin"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.calc_tlin" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.eigs_K_to_T">
+<em class="property">static </em><code class="descname">eigs_K_to_T</code><span class="sig-paren">(</span><em>g</em>, <em>tau</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn.eigs_K_to_T"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.eigs_K_to_T" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.isocommittor_surfaces">
+<code class="descname">isocommittor_surfaces</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn.isocommittor_surfaces"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.isocommittor_surfaces" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.setup_k_mtx">
+<em class="property">static </em><code class="descname">setup_k_mtx</code><span class="sig-paren">(</span><em>ktn</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn.setup_k_mtx"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.setup_k_mtx" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.setup_sp_k_mtx">
+<em class="property">static </em><code class="descname">setup_sp_k_mtx</code><span class="sig-paren">(</span><em>ktn</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn.setup_sp_k_mtx"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.setup_sp_k_mtx" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.sort_eigs">
+<em class="property">static </em><code class="descname">sort_eigs</code><span class="sig-paren">(</span><em>eigs</em>, <em>evecs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn.sort_eigs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.sort_eigs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.varopt_simann">
+<code class="descname">varopt_simann</code><span class="sig-paren">(</span><em>coarse_ktn</em>, <em>nsteps</em>, <em>seed=21</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Analyse_coarse_ktn.varopt_simann"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Analyse_coarse_ktn.varopt_simann" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="ktn_analysis.coarse_ktn_analysis.Coarse_ktn">
+<em class="property">class </em><code class="descclassname">ktn_analysis.coarse_ktn_analysis.</code><code class="descname">Coarse_ktn</code><span class="sig-paren">(</span><em>parent_ktn</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Coarse_ktn"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Coarse_ktn" title="Permalink to this definition">¶</a></dt>
+<dd><p>Construct a coarse network given the communities and inter-node transition rates for the full network
+from which it is to be derived.
+Note that a Coarse_ktn object has an empty edgelist that includes all inter-community transitions in a
+different order compared to Ktn objects read from a file.
+Note that Ktn.construct_coarse_ktn(…) is overridden here. Thus Ktn.construct_coarse_ktn() cannot be
+called from the Coarse_ktn derived class, as is desirable.</p>
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Coarse_ktn.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>parent_ktn</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Coarse_ktn.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Coarse_ktn.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self.  See help(type(self)) for accurate signature.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Coarse_ktn.construct_coarse_ktn">
+<code class="descname">construct_coarse_ktn</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Coarse_ktn.construct_coarse_ktn" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Coarse_ktn.get_evec_errors">
+<code class="descname">get_evec_errors</code><span class="sig-paren">(</span><em>n</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Coarse_ktn.get_evec_errors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Coarse_ktn.get_evec_errors" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge">
+<em class="property">class </em><code class="descclassname">ktn_analysis.coarse_ktn_analysis.</code><code class="descname">Edge</code><span class="sig-paren">(</span><em>edge_id</em>, <em>ts_id</em>, <em>ktn=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Edge"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge" title="Permalink to this definition">¶</a></dt>
+<dd><p>The Edge class provides a representation of an edge in a KTN, where each
+edge weight is log(transition probability). Each edge also represents a
+transition state connecting two minima (nodes), whose energy is stored.
+Reactive flux between nodes are also calculated.</p>
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.edge_id">
+<code class="descname">edge_id</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.edge_id" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>int</em> – edge ID (NB is unique and indexed from 1)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.ts_id">
+<code class="descname">ts_id</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.ts_id" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>int</em> – transition state ID (bidirectional edges will share the same ts ID)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.ts_en">
+<code class="descname">ts_en</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.ts_en" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – transition state energy</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.k">
+<code class="descname">k</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.k" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – log(transition rate), <span class="math notranslate nohighlight">\(k_{ij}\)</span></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.t">
+<code class="descname">t</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.t" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – transition probability, i.e. branching probability <span class="math notranslate nohighlight">\(P_{ij}\)</span></p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.j">
+<code class="descname">j</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.j" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – Net flux — still confused about this one</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.f">
+<code class="descname">f</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.f" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – reactive flux</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.fe">
+<code class="descname">fe</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.fe" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – net reactive flux</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.deadts">
+<code class="descname">deadts</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.deadts" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>bool</em> – flag to indicate dead transition state, aka this edge form a self-loop</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.to_node">
+<code class="descname">to_node</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.to_node" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>Node object</em> – which node edge is pointing to</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.from_node">
+<code class="descname">from_node</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.from_node" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>Node object</em> – which node edge is coming from</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.__rev_edge">
+<code class="descname">__rev_edge</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.__rev_edge" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>Edge object</em> – reverse edge corresponding to from_node &lt;- to_node</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.ktn">
+<code class="descname">ktn</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.ktn" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>Ktn object</em> – reference to the Ktn object to which the Edge belongs</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>edge_id</em>, <em>ts_id</em>, <em>ktn=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Edge.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self.  See help(type(self)) for accurate signature.</p>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.calc_f">
+<em class="property">static </em><code class="descname">calc_f</code><span class="sig-paren">(</span><em>node1</em>, <em>node2</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Edge.calc_f"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.calc_f" title="Permalink to this definition">¶</a></dt>
+<dd><p>does this actually calculate f_ij^AB?</p>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.calc_fe">
+<em class="property">static </em><code class="descname">calc_fe</code><span class="sig-paren">(</span><em>edge1</em>, <em>edge2</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Edge.calc_fe"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.calc_fe" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate effective current in Metzner 2.33, :math:<a href="#id1"><span class="problematic" id="id2">`</span></a>f_{ij}^+ =
+max(f_{ij}^{AB} - f_{ji}^{AB}, 0).</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>edge1</strong> (<em>Edge object</em>) – edge from node j to node i</li>
+<li><strong>edge2</strong> (<em>Edge object</em>) – edge from node i to node j</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.calc_j">
+<em class="property">static </em><code class="descname">calc_j</code><span class="sig-paren">(</span><em>edge1</em>, <em>edge2</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Edge.calc_j"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.calc_j" title="Permalink to this definition">¶</a></dt>
+<dd><p>what is this referring to?</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.edge_attribs">
+<code class="descname">edge_attribs</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.edge_attribs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt>
+<code class="descname">fe</code><em class="property"> = None</em></dt>
+<dd><p>what is a dead transition state?</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.flow_vals">
+<code class="descname">flow_vals</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.flow_vals" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.rev_edge">
+<code class="descname">rev_edge</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.rev_edge" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Edge.to_from_nodes">
+<code class="descname">to_from_nodes</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Edge.to_from_nodes" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn">
+<em class="property">class </em><code class="descclassname">ktn_analysis.coarse_ktn_analysis.</code><code class="descname">Ktn</code><span class="sig-paren">(</span><em>n_nodes</em>, <em>n_edges</em>, <em>n_comms</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn" title="Permalink to this definition">¶</a></dt>
+<dd><p>The Ktn class provides a representation of a kinetic transition network
+with a pre-specified number of nodes, edges, and communities into which
+nodes are partitioned.</p>
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.n_nodes">
+<code class="descname">n_nodes</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.n_nodes" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>int</em> – Number of nodes in network</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.n_edges">
+<code class="descname">n_edges</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.n_edges" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>int</em> – number of bidirectional edges</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.n_comms">
+<code class="descname">n_comms</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.n_comms" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>int</em> – number of communities into which nodes are partitioned</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.nodelist">
+<code class="descname">nodelist</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.nodelist" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(n_nodes,) list</em> – list of Node objects in KTN</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.edgelist">
+<code class="descname">edgelist</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.edgelist" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>(n_edges,) list</em> – list of Edge objects in KTN</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.dbalance">
+<code class="descname">dbalance</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.dbalance" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>bool</em> – Flag to indicate if detailed balance holds. Defaults to False.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.A">
+<code class="descname">A</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.A" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>set</em> – endpoint nodes in the set A</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.B">
+<code class="descname">B</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.B" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>set</em> – endpoint nodes in the set B</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>n_nodes</em>, <em>n_edges</em>, <em>n_comms</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self.  See help(type(self)) for accurate signature.</p>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.check_edge_reverse">
+<em class="property">static </em><code class="descname">check_edge_reverse</code><span class="sig-paren">(</span><em>edge1</em>, <em>edge2</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.check_edge_reverse"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.check_edge_reverse" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.check_if_edge">
+<em class="property">static </em><code class="descname">check_if_edge</code><span class="sig-paren">(</span><em>edge</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.check_if_edge"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.check_if_edge" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.check_if_node">
+<em class="property">static </em><code class="descname">check_if_node</code><span class="sig-paren">(</span><em>node</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.check_if_node"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.check_if_node" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.construct_coarse_ktn">
+<code class="descname">construct_coarse_ktn</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.construct_coarse_ktn"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.construct_coarse_ktn" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.construct_ktn">
+<code class="descname">construct_ktn</code><span class="sig-paren">(</span><em>comms</em>, <em>conns</em>, <em>pi</em>, <em>k</em>, <em>node_ens</em>, <em>ts_ens</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.construct_ktn"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.construct_ktn" title="Permalink to this definition">¶</a></dt>
+<dd><p>Construct a KTN.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>comms</strong> (<em>array-like</em>) – Should be same length as number of nodes? so guestting community
+IDs of each node. Don’t worry about this for now.</li>
+<li><strong>conns</strong> (<em>(</em><em>n_edges</em><em>, </em><em>2</em><em>) </em><em>array-like</em>) – specifies connections between nodes. conns[i][0] specifies
+from_node of edge i and conns[i][1] specifies to_node of edge i.</li>
+<li><strong>pi</strong> (<em>(</em><em>n_nodes</em><em>,</em><em>) </em><em>list</em>) – equilibrium occupation probabilities of all nodes in KTN</li>
+<li><strong>k</strong> (<em>(</em><em>2*n_edges</em><em>,</em><em>) </em><em>list</em>) – rates ordered such that k[i] and k[i+1] specificy forward and rate
+and backward rate for edge between nodes i and i+1.</li>
+<li><strong>node_ens</strong> (<em>(</em><em>n_nodes</em><em>,</em><em>) </em><em>list</em><em>[</em><em>float</em><em>]</em>) – energies of nodes in KTN</li>
+<li><strong>ts_ens</strong> (<em>(</em><em>n_edges</em><em>,</em><em>) </em><em>list</em><em>[</em><em>float</em><em>]</em>) – TS energies, one for each bidirectional edge.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.get_comm_stat_probs">
+<code class="descname">get_comm_stat_probs</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.get_comm_stat_probs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.get_comm_stat_probs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.get_eigvecs">
+<code class="descname">get_eigvecs</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.get_eigvecs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.get_eigvecs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.print_gephi_fmt">
+<code class="descname">print_gephi_fmt</code><span class="sig-paren">(</span><em>fmt='csv'</em>, <em>mode=0</em>, <em>evec_idx=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.print_gephi_fmt"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.print_gephi_fmt" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.read_double_col">
+<em class="property">static </em><code class="descname">read_double_col</code><span class="sig-paren">(</span><em>fname</em>, <em>n_lines</em>, <em>fmt='int'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.read_double_col"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.read_double_col" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.read_ktn_info">
+<em class="property">static </em><code class="descname">read_ktn_info</code><span class="sig-paren">(</span><em>n_nodes</em>, <em>n_edges</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.read_ktn_info"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.read_ktn_info" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.read_single_col">
+<em class="property">static </em><code class="descname">read_single_col</code><span class="sig-paren">(</span><em>fname</em>, <em>n_lines</em>, <em>fmt='int'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.read_single_col"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.read_single_col" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.renormalise_mr">
+<code class="descname">renormalise_mr</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.renormalise_mr"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.renormalise_mr" title="Permalink to this definition">¶</a></dt>
+<dd><p>Eq. 2.20 in Metzner</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.renormalise_pi">
+<code class="descname">renormalise_pi</code><span class="sig-paren">(</span><em>mode=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.renormalise_pi"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.renormalise_pi" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Ktn.write_nodes_info">
+<code class="descname">write_nodes_info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Ktn.write_nodes_info"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Ktn.write_nodes_info" title="Permalink to this definition">¶</a></dt>
+<dd><p>dump relevant node information to files: eigenvectors, eigenvector errors, communities. If called
+from a Coarse_ktn object, then data for both the coarse and parent KTN
+objects is written.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node">
+<em class="property">class </em><code class="descclassname">ktn_analysis.coarse_ktn_analysis.</code><code class="descname">Node</code><span class="sig-paren">(</span><em>node_id</em>, <em>ktn=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Node"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node" title="Permalink to this definition">¶</a></dt>
+<dd><p>The Node class represents a single node in a kinetic transition network
+(KTN), where each node is a potential energy minima of the free energy
+landscape.</p>
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.node_id">
+<code class="descname">node_id</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.node_id" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>int</em> – node ID. NB indexed from 1</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.node_en">
+<code class="descname">node_en</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.node_en" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – node energy</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.comm_id">
+<code class="descname">comm_id</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.comm_id" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>int</em> – community ID. NB indexed from 0</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.pi">
+<code class="descname">pi</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.pi" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – log of the node stationary probability</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.mr">
+<code class="descname">mr</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.mr" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – reactive trajectory current</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.qf">
+<code class="descname">qf</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.qf" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – node forward committor probability</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.qb">
+<code class="descname">qb</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.qb" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – node backward committor probability</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.k_esc">
+<code class="descname">k_esc</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.k_esc" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – sum of transition rates out of node (node out-degree)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.k_in">
+<code class="descname">k_in</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.k_in" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – sum of transition rates into node (node in-degree)</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.t">
+<code class="descname">t</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.t" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>float</em> – self-transition probability, <span class="math notranslate nohighlight">\(P_{ii}\)</span>.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.nbrlist">
+<code class="descname">nbrlist</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.nbrlist" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>list</em> – list of neighboring nodes via TO edges that flow towards node</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.edgelist_in">
+<code class="descname">edgelist_in</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.edgelist_in" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>list</em> – list of edges TO node</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.edgelist_out">
+<code class="descname">edgelist_out</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.edgelist_out" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>list</em> – list of edges FROM node</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.evec">
+<code class="descname">evec</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.evec" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>list[float]</em> – list of values for the dominant eigenvectors</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.ktn">
+<code class="descname">ktn</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.ktn" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>ktn</em> – reference to the Ktn object to which the Node belongsa</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.__init__">
+<code class="descname">__init__</code><span class="sig-paren">(</span><em>node_id</em>, <em>ktn=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Node.__init__"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self.  See help(type(self)) for accurate signature.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.calc_k_esc_in">
+<code class="descname">calc_k_esc_in</code><span class="sig-paren">(</span><em>mode=0</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Node.calc_k_esc_in"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.calc_k_esc_in" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate the escape rate and total in rate for each node.
+Escape rate defined as <span class="math notranslate nohighlight">\(\sum_j k_{ji}\)</span> and total in rate defined
+as <span class="math notranslate nohighlight">\(\sum_l k_{il}\)</span>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mode</strong> (<em>int</em><em> [</em><em>0</em><em> or </em><em>1</em><em>]</em>) – If mode is 1, only calculate escape rate. Defaults to 0.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.calc_mr">
+<em class="property">static </em><code class="descname">calc_mr</code><span class="sig-paren">(</span><em>node</em>, <em>dbalance=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Node.calc_mr"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.calc_mr" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate the probability distribution of reactive trajectories
+defined in Metzner et al. 2009 in eqn. 2.11,
+<span class="math notranslate nohighlight">\(m_i^R = \pi_i q_i^+ q_i^-\)</span>. If detailed balance applies, this
+reduces to <span class="math notranslate nohighlight">\(m_i^R = \pi_i q_i^+ (1 - q_i^+)\)</span>.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>dbalance</strong> (<em>Bool</em>) – Whether or not detailed balance condition applies at this node,
+meaning <span class="math notranslate nohighlight">\(\pi_i K_{ij} = \pi_j K_{ij}\)</span>. Defaults to False.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.calc_node_t">
+<code class="descname">calc_node_t</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/ktn_analysis/coarse_ktn_analysis.html#Node.calc_node_t"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.calc_node_t" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate self-transition probability for node, i.e.
+<span class="math notranslate nohighlight">\(P_{ii} = 1 - \sum_j P_{ji}\)</span>.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.node_attribs">
+<code class="descname">node_attribs</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.node_attribs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="ktn_analysis.coarse_ktn_analysis.Node.tpt_vals">
+<code class="descname">tpt_vals</code><a class="headerlink" href="#ktn_analysis.coarse_ktn_analysis.Node.tpt_vals" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return TPT values for this node.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">ktn_analysis: Analyzing Kinetic Transition Networks</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/ktn_analysis.coarse_ktn_analysis.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="ktn_analysis: Analyzing Kinetic Transition Networks"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ktn_analysis 2019 documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2019, Daniel J. Sharpe and Deepti Kannan.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.7.5.
+    </div>
+  </body>
+</html>
