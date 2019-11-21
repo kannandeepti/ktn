@@ -12,10 +12,12 @@ Deepti Kannan 2019."""
 
 import re
 import numpy as np
-import sys
+import os
 from pathlib import Path
+from matplotlib import pyplot as plt
 
 INDEX_OF_KEYWORD_VALUE = 15
+PATHSAMPLE = "/home/dk588/svn/PATHSAMPLE/builds/gfortran/PATHSAMPLE"
 
 class ParsedPathsample(object):
     
@@ -89,7 +91,7 @@ class ScanPathsample(object):
     def __init__(self, pathdata, outbase=None):
         self.pathdatafile = pathdata #base input file to modify
         self.parse = ParsedPathsample(pathdata=pathdata)
-        self.outbase = 'out.' #prefix for pathsample output files
+        self.outbase = 'out' #prefix for pathsample output files
         if outbase is not None:
             self.outbase = outbase
         self.outputs = {} #list of output dictionaries
@@ -105,8 +107,8 @@ class ScanPathsample(object):
             #overwrite pathdata file with updated input
             self.parse.write_input(self.pathdatafile)
             #run calculation 
-            outfile = f'{self.outbase}.{name}.{value}'
-            sys.stdout(f'PATHSAMPLE > {outfile}')
+            outfile = f"{self.outbase}.{name}.{value}"
+            os.system(f"{PATHSAMPLE} > {outfile}")
             #parse output
             self.parse.parse_output(outfile=outfile)
             #store the output under the value it was run at
@@ -114,7 +116,17 @@ class ScanPathsample(object):
                 outputvals.append(self.parse.output[outputkey])
             self.outputs[value] = self.parse.output
         
-        if output key is not None:
+        if outputkey is not None:
             return values, outputvals
-    
+
+if __name__=='__main__':
+    scan = ScanPathsample('./pathdata', outbase='out')
+    nrgthreshs = np.logspace(0.1, 1.0, 100)
+    values, outputvals = scan.scan_param('TEMPERATURE', nrgthreshs.tolist(),
+                                         outputkey='kSSAB')
+    fig, ax = plt.subplots()
+    plt.plot(values, outputvals, '-o')
+    plt.xlabel(r'$k_BT$')
+    plt.ylabel(r'$k^{SS}_{AB}$')
+
 
