@@ -134,11 +134,7 @@ class ScanPathsample(object):
             #overwrite pathdata file with updated input
             self.parse.write_input(self.pathdatafile)
             #run calculation 
-<<<<<<< HEAD
-            outfile = f"{self.outbase}.{name}.{value}"
-=======
             outfile = f'{self.outbase}.{name}.{value:.2f}'
->>>>>>> CODE: code_wrapper now does NGT & REGROUPFREE scanning
             os.system(f"{PATHSAMPLE} > {outfile}")
             #parse output
             self.parse.parse_output(outfile=outfile)
