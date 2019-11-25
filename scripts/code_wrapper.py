@@ -13,6 +13,7 @@ Deepti Kannan 2019."""
 import re
 import numpy as np
 import os
+import glob
 from pathlib import Path
 from matplotlib import pyplot as plt
 
@@ -49,7 +50,6 @@ class ParsedPathsample(object):
                         self.output['kSSAB'] = float(words[3])
                         self.output['kSSBA'] = float(words[6])
                     if words[0] == 'NGT>' and words[1]=='kNSS(A<-B)=':
-                        print(words)
                         self.output['kNSSAB'] = float(words[2])
                         self.output['kNSSBA'] = float(words[4])
 
@@ -84,7 +84,12 @@ class ParsedPathsample(object):
                 f.write(str(name).upper() + ' '*numspaces + str(self.input[name]) + '\n')
 
     def append_input(self, name, value):
+        """Add a keywrod."""
         self.input.update({name: value})
+
+    def comment_input(self, name):
+        """Comment out a keyword from pathdata file."""
+        self.input.pop(name, None)
 
 class ScanPathsample(object):
 
@@ -96,18 +101,44 @@ class ScanPathsample(object):
             self.outbase = outbase
         self.outputs = {} #list of output dictionaries
 
+    def run_NGT_regrouped(self, Gthresh):
+        """After each regrouping, calculate kNSS on regrouped minima."""
+        #Rename regrouped files to min.A and min.B to pass as input to PATHSAMPLE
+        files_to_modify = ['min.A', 'min.B', 'min.data', 'ts.data']
+        for f in files_to_modify:
+            os.system(f"mv {f} {f}.original")
+            os.system(f"mv {f}.regrouped.0.2000000000 {f}")
+        #run NGT without regroup on regrouped minima
+        scan.parse.comment_input('REGROUPFREE')
+        scan.parse.comment_input('DUMPGROUPS')
+        scan.parse.write_input(scan.pathdatafile)
+        outfile_noregroup = f'out.NGT.kNSS.{Gthresh:.2f}'
+        os.system(f"{PATHSAMPLE} > {outfile_noregroup}")
+        scan.parse.parse_output(outfile=outfile_noregroup)
+        kNSSexact = scan.parse.output['kNSSAB']
+        #restore original file names
+        for f in files_to_modify:
+            os.system(f"mv {f} {f}.regrouped.0.2000000000")
+            os.system(f"mv {f}.original {f}")
+        return kNSSexact
+    
     def scan_param(self, name, values, outputkey=None):
         """Re-run PATHSAMPLE calculations by changing
         values of keyword `name` one at a time."""
         corrected_name = str(name).upper()
         outputvals = []
+        kNSSs = []
         for value in values:
             #update input
             self.parse.append_input(name, value)
             #overwrite pathdata file with updated input
             self.parse.write_input(self.pathdatafile)
             #run calculation 
+<<<<<<< HEAD
             outfile = f"{self.outbase}.{name}.{value}"
+=======
+            outfile = f'{self.outbase}.{name}.{value:.2f}'
+>>>>>>> CODE: code_wrapper now does NGT & REGROUPFREE scanning
             os.system(f"{PATHSAMPLE} > {outfile}")
             #parse output
             self.parse.parse_output(outfile=outfile)
@@ -115,18 +146,46 @@ class ScanPathsample(object):
             if outputkey is not None:
                 outputvals.append(self.parse.output[outputkey])
             self.outputs[value] = self.parse.output
-        
+            kNSSs.append(self.run_NGT_regrouped(value))
+            print(f"Computed rate constants for regrouped minima with threshold {value}") 
         if outputkey is not None:
-            return values, outputvals
+            return outputvals, kNSSs
 
 if __name__=='__main__':
-    scan = ScanPathsample('./pathdata', outbase='out')
-    nrgthreshs = np.logspace(0.1, 1.0, 100)
-    values, outputvals = scan.scan_param('TEMPERATURE', nrgthreshs.tolist(),
-                                         outputkey='kSSAB')
+    scan = ScanPathsample('./pathdata', outbase='out.NGT')
+    temp = 0.2
+    scan.parse.append_input('TEMPERATURE', temp)
+    nrgthreshs = np.linspace(0.01, 2.0, 100)
+    #np.save('nrgthreshs.npy', nrgthreshs)
+    kSSs, kNSSs = scan.scan_param('REGROUPFREE', nrgthreshs.tolist(), outputkey='kSSAB')
+    #np.save(f'kSSAB_nrgthreshs_T{temp}.npy', kSSs)
+    """ This just reproduces the same as result as kNSS without regrouping
+    kNSSvals = []
+    for value in nrgthreshs:
+        kNSSvals.append(scan.outputs[value]['kNSSAB'])
+    np.save(f'kNSSAB_Gthresh_T{temp}.npy', kNSSvals)
+    """
+    #compare to kNSS calculation without free energy regrouping
+    scan.parse.comment_input('REGROUPFREE')
+    scan.parse.comment_input('DUMPGROUPS')
+    scan.parse.write_input(scan.pathdatafile)
+    outfile_noregroup = 'out.NGT.NOREGROUP'
+    os.system(f"{PATHSAMPLE} > {outfile_noregroup}")
+    scan.parse.parse_output(outfile=outfile_noregroup)
+    kNSSexact = scan.parse.output['kNSSAB']
+    
+    #plot kSSAB, kNSSAB as a function of Gthresh, and the exact kNSS
     fig, ax = plt.subplots()
-    plt.plot(values, outputvals, '-o')
-    plt.xlabel(r'$k_BT$')
-    plt.ylabel(r'$k^{SS}_{AB}$')
+    plt.plot(nrgthreshs, kSSs, '-o', label='kSSAB', markersize=2)
+    plt.plot(nrgthreshs, kNSSs, '-o', label='kNSSAB', markersize=2)
+    plt.plot(nrgthreshs, np.tile(kNSSexact, len(nrgthreshs)), '--', label='kNSSexact')
+    plt.xlabel(r'$G_{thresh}$')
+    plt.ylabel(r'$k_{AB}$')
+    plt.legend()
+    plt.savefig(f'kAB_Gthresh_T{temp}.png')
 
-
+    #remove all out* files to keep directory clean
+    for f in glob.glob('out*'):
+        if Path(f).exists():	
+            Path(f).unlink() 
+    
