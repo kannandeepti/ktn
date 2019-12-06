@@ -16,23 +16,7 @@ import os
 import glob
 import pandas as pd
 from pathlib import Path
-from matplotlib import pyplot as plt
-import seaborn as sns
-sns.set()
 
-params = {'axes.edgecolor': 'black', 'axes.grid': True, 'axes.titlesize': 20.0,
-          'axes.linewidth': 0.75, 'backend': 'pdf','axes.labelsize':
-          18,'legend.fontsize': 18,
-          'xtick.labelsize': 18,'ytick.labelsize': 18,'text.usetex':
-          False,'figure.figsize': [7, 5],
-          'mathtext.fontset': 'stixsans', 'savefig.format': 'pdf',
-          'xtick.bottom':True, 'xtick.major.pad': 5, 'xtick.major.size': 5,
-          'xtick.major.width': 0.5,
-          'ytick.left':True, 'ytick.right':False, 'ytick.major.pad': 5,
-          'ytick.major.size': 5, 'ytick.major.width': 0.5,
-          'ytick.minor.right':False, 'lines.linewidth':2}
-
-plt.rcParams.update(params)
 MAXINA = 5
 MAXINB = 395
 INDEX_OF_KEYWORD_VALUE = 15
@@ -40,7 +24,7 @@ PATHSAMPLE = "/home/dk588/svn/PATHSAMPLE/build/gfortran/PATHSAMPLE"
 
 class ParsedPathsample(object):
     
-    def __init__(self, maxinA=5, maxinB=395, outfile=None, pathdata=None):
+    def __init__(self, pathdata, maxinA=5, maxinB=395, outfile=None):
         self.output = {} #dictionary of output (i.e. temperature, rates)
         self.input = {} #dictionary of PATHSAMPLE keywords
         self.numInA = 0 #number of minima in A
@@ -50,13 +34,13 @@ class ParsedPathsample(object):
         self.maxinA = maxinA #maximum allowed number of minima in A set
         self.maxinB = maxinB #maximum allowed number of minima in B set
         #read in numInA, numInB, minA, minB from min.A and min.B files
-        self.parse_minA_and_minB()
+        self.path = Path(pathdata).parent.absolute()
+        self.parse_minA_and_minB(self.path/'min.A', self.path/'min.B')
         if outfile is not None:
             self.parse_output(outfile)
-        if pathdata is not None:
-            self.parse_input(pathdata)
+        self.parse_input(pathdata)
     
-    def parse_minA_and_minB(self, minA='min.A', minB='min.B'):
+    def parse_minA_and_minB(self, minA, minB):
         """Read in the number of minima and the minima IDs in the A and B sets
         from the min.A and min.B files. Note, minima IDs in these files
         correspond to line numbers in min.data. However, in this class, we
@@ -69,7 +53,6 @@ class ParsedPathsample(object):
         Aids = np.array(Aids).astype(int)
         maxinA = Aids[0]
         #adjust indices by 1 cuz python is 0-indexed
-        print(Aids)
         Aids = Aids[1:] - 1
         self.minA = Aids
         self.numInA = maxinA
@@ -80,46 +63,53 @@ class ParsedPathsample(object):
                 Bids = Bids + line.split()
         Bids = np.array(Bids).astype(int)
         maxinB = Bids[0]
-        print(Bids)
         Bids = Bids[1:] - 1
         self.minB = Bids
         self.numInB = maxinB
-        print(self.numInA)
-        print(self.numInB)
 
-    def define_A_and_B(self, numInA, numInB, mindata='min.data'):
+    def sort_A_and_B(self, minA, minB, mindata):
+        """Sort the minima in min.A and min.B according to their energies."""
+        self.parse_minA_and_minB(minA, minB)
+        min_nrgs = np.loadtxt(mindata).astype(float)[:,0]
+        minA_nrgs = min_nrgs[self.minA]
+        sorted_idAs = np.argsort(minA_nrgs)
+        self.minA = self.minA[sorted_idAs]
+        print(self.minA)
+        minB_nrgs = min_nrgs[self.minB]
+        sorted_idBs = np.argsort(minB_nrgs)
+        self.minB = self.minB[sorted_idBs]
+        print(self.minB)
+        self.write_minA_minB(self.path/'min.A', self.path/'min.B')
+
+    def define_A_and_B(self, numInA, numInB, sorted=True, mindata=None):
         """Define an A and B set as a function of the number of minima in A
         and B. """
         if numInA > self.maxinA:
-            raise ValueError(f'The maximum allowed number of states in A is
-                             {self.maxinA}')
+            raise ValueError(f'The maximum allowed number of states in A is {self.maxinA}')
         if numInB > self.maxinB:
-            raise ValueError(f'The maximum allowed number of states in B is
-                             {self.maxinB}')
+            raise ValueError(f'The maximum allowed number of states in B is {self.maxinB}')
+        if sorted:
+            #min.A and min.B are already sorted by energy
+            #just change numInA and numInB
+            self.numInA = numInA
+            self.numInB = numInB
+            return
+        if mindata is None:
+            mindata = self.path/'min.data'
         #first column of min.data gives free energies
         min_nrgs = np.loadtxt(mindata).astype(float)[:,0]
         #index minima by 0 to correspond to indices of min_nrgs
-        minIDs = np.arange(0, len(minA_nrgs), 1)
-        #create a dictionary mapping minima ID's to their energies
-        minrgs = {id : nrg for id, nrg in zip(minIDs, min_nrgs)}
-        #extract the subset of minima that correspond to the maximal A set
+        minIDs = np.arange(0, len(min_nrgs), 1)
         minA_nrgs = min_nrgs[self.minA]
-        print(minA_nrgs)
         minB_nrgs = min_nrgs[self.minB]
-        print(minB_nrgs)
-        #PROBLEM: this returns IDs of minA_nrgs, not of min_nrgs
         idA = np.argpartition(minA_nrgs, numInA)
-        self.minA = idA[:numInA]
+        self.minA = self.minA[idA[:numInA]]
         self.numInA = numInA
         idB = np.argpartition(minB_nrgs, numInB)
-        self.minB = idB[:numInB]
+        self.minB = self.minB[idB[:numInB]]
         self.numInB = numInB
-        print(self.numInA)
-        print(self.numInB)
-        print(self.minA)
-        print(self.minB)
         
-    def write_minA_minB(self, minA='min.A.test', minB='min.B.test'):
+    def write_minA_minB(self, minA, minB):
         """Write a min.A and min.B file based on minIDs
         specified in self.minA and self.minB"""
         with open(minA,'w') as f:
@@ -153,6 +143,9 @@ class ParsedPathsample(object):
                     if words[0] == 'NGT>' and words[1]=='kNSS(A<-B)=':
                         self.output['kNSSAB'] = float(words[2])
                         self.output['kNSSBA'] = float(words[4])
+                    if words[0] == 'NGT>' and words[1]=='k(A<-B)=':
+                        self.output['kAB'] = float(words[2])
+                        self.output['kBA'] = float(words[4])
 
     def parse_input(self, pathdata):
         """Store keywords in pathdata as a dictionary.
@@ -197,6 +190,7 @@ class ScanPathsample(object):
     def __init__(self, pathdata, outbase=None, suffix=''):
         self.pathdatafile = pathdata #base input file to modify
         self.parse = ParsedPathsample(pathdata=pathdata)
+        self.path = Path(pathdata).parent.absolute()
         self.suffix = suffix #suffix of rates_{suffix}.csv file output
         self.outbase = 'out' #prefix for pathsample output files
         if outbase is not None:
@@ -206,7 +200,8 @@ class ScanPathsample(object):
     def run_NGT_regrouped(self, Gthresh, temp, direction=None):
         """After each regrouping, calculate kNSS on regrouped minima."""
         #Rename regrouped files to min.A and min.B to pass as input to PATHSAMPLE
-        files_to_modify = ['min.A', 'min.B', 'min.data', 'ts.data']
+        files_to_modify = [self.path/'min.A', self.path/'min.B',
+                           self.path/'min.data', self.path/'ts.data']
         for f in files_to_modify:
             os.system(f"mv {f} {f}.original")
             os.system(f"mv {f}.regrouped.{temp:.10f} {f}")
@@ -214,7 +209,7 @@ class ScanPathsample(object):
         scan.parse.comment_input('REGROUPFREE')
         scan.parse.comment_input('DUMPGROUPS')
         scan.parse.write_input(scan.pathdatafile)
-        outfile_noregroup = f'out.NGT.kNSS.{Gthresh:.2f}'
+        outfile_noregroup = self.path/f'out.NGT.kNSS.{Gthresh:.2f}'
         os.system(f"{PATHSAMPLE} > {outfile_noregroup}")
         scan.parse.parse_output(outfile=outfile_noregroup)
         kNSSAB = scan.parse.output['kNSSAB']
@@ -235,7 +230,7 @@ class ScanPathsample(object):
         self.parse.comment_input('REGROUPFREE')
         self.parse.comment_input('DUMPGROUPS')
         self.parse.write_input(scan.pathdatafile)
-        outfile_noregroup = 'out.NGT.NOREGROUP'
+        outfile_noregroup = self.path/'out.NGT.NOREGROUP'
         os.system(f"{PATHSAMPLE} > {outfile_noregroup}")
         scan.parse.parse_output(outfile=outfile_noregroup)
         kNSSAB = scan.parse.output['kNSSAB']
@@ -252,7 +247,7 @@ class ScanPathsample(object):
         REGROUPFREE threshold. Extract output defined by outputkey and run NGT
         on the regrouped minima to get the SS/NSS rate constants."""
         corrected_name = str(name).upper()
-        csv = Path(f'./rates_{self.suffix}.csv')
+        csv = Path(f'csvs/rates_{self.suffix}.csv')
         dfs = []
         for value in values:
             df = pd.DataFrame()
@@ -261,7 +256,7 @@ class ScanPathsample(object):
             #overwrite pathdata file with updated input
             self.parse.write_input(self.pathdatafile)
             #run calculation 
-            outfile = f'{self.outbase}.{name}.{value:.2f}'
+            outfile = self.path/f'{self.outbase}.{name}.{value:.2f}'
             os.system(f"{PATHSAMPLE} > {outfile}")
             #parse output
             self.parse.parse_output(outfile=outfile)
@@ -290,7 +285,7 @@ class ScanPathsample(object):
         """Re-run PATHSAMPLE at different temperatures specified by values and
         extract kNSSAB and kNSSBA from the NGT keyword output."""
         corrected_name = str(name).upper()
-        csv = Path(f'./rates_{self.suffix}.csv')
+        csv = Path(f'csvs/rates_{self.suffix}.csv')
         dfs = []
         for value in values:
             df = pd.DataFrame()
@@ -299,7 +294,7 @@ class ScanPathsample(object):
             #overwrite pathdata file with updated input
             self.parse.write_input(self.pathdatafile)
             #run calculation 
-            outfile = f'{self.outbase}.{name}.{value:.2f}'
+            outfile = self.path/f'{self.outbase}.{name}.{value:.2f}'
             os.system(f"{PATHSAMPLE} > {outfile}")
             #parse output
             self.parse.parse_output(outfile=outfile)
@@ -307,6 +302,10 @@ class ScanPathsample(object):
             self.outputs[value] = self.parse.output
             df['kNSSAB'] = [self.parse.output['kNSSAB']]
             df['kNSSBA'] = [self.parse.output['kNSSBA']]
+            df['kSSAB'] = [self.parse.output['kSSAB']]
+            df['kSSBA'] = [self.parse.output['kSSBA']]
+            df['kAB'] = [self.parse.output['kAB']]
+            df['kBA'] = [self.parse.output['kBA']]
             df['T'] = [value]
             dfs.append(df)
             print(f"Computed rate constants for temperature {value}") 
@@ -320,6 +319,12 @@ class ScanPathsample(object):
         #write updated file to csv
         bigdf.to_csv(csv, index=False)
 
+    def remove_output(self):
+        """Delete PATHSAMPLE log files."""
+        for f in glob.glob(self.path/'out*'):
+            if Path(f).exists():	
+                Path(f).unlink() 
+
 """ Functions for using the ScanPathsample and ParseSample classes to perform
 useful tasks. """
 
@@ -330,24 +335,24 @@ def scan_product_states(numinAs, numinBs, temps):
         raise ValueError('numinAs and numinBs must have the same shape')
     
     for i in range(len(numinAs)):
-        suffix = 'ABscan'
-        scan = ScanPathsample('./pathdata', suffix=suffix)
-        scan.parse.define_A_and_B(numinAs[i], numinBs[i])
-        scan.parse.write_minA_minB('min.A','min.B')
-        #scan.scan_temp('TEMPERATURE', temps)
-        #remove_output()
+        suffix = 'kNGT_ABscan'
+        scan = ScanPathsample('/scratch/dk588/databases/LJ38.2010/10000.minima/pathdata', suffix=suffix)
+        #since min.A/min.B have been sorted, simply change scan.parse.numInA/B
+        scan.parse.define_A_and_B(numinAs[i], numinBs[i], sorted=True, mindata=scan.path/'min.data')
+        #write new min.A/B files with first line changed
+        scan.parse.write_minA_minB(scan.path/'min.A',scan.path/'min.B')
+        scan.scan_temp('TEMPERATURE', temps)
+        scan.remove_output()
 
-def remove_output():
-    """Delete PATHSAMPLE log files."""
-    for f in glob.glob('out*'):
-        if Path(f).exists():	
-            Path(f).unlink() 
 
 if __name__=='__main__':
-    temps = np.arange(0.03, 0.31, 0.01)
-    print(temps)
-    numinAs = [1]
-    numinBs = [1]
+    temps = np.arange(0.03, 0.16, 0.01)
+    #temps = np.array([0.03, 0.04])
+    numinAs = [1, 1, 1, 1, 1,  1,   1,   1,   1,   1]
+    numinBs = [1, 2, 3, 5, 7, 10, 100, 200, 300, 395]
+    parse = ParsedPathsample('/scratch/dk588/databases/LJ38.2010/10000.minima/pathdata')
+    #parse.sort_A_and_B(parse.path/'min.A.master',parse.path/'min.B.master', parse.path/'min.data')
+    os.system(f"{PATHSAMPLE} > test")
     scan_product_states(numinAs, numinBs, temps)
     """
     for temp in temps:
