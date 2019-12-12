@@ -24,42 +24,29 @@ params = {'axes.edgecolor': 'black', 'axes.grid': True, 'axes.titlesize': 20.0,
 
 plt.rcParams.update(params)
 
-def plot_kAB_Gthresh(direction='BA'):
-    """plot kSSAB, kNSSAB as a function of Gthresh, and the exact kNSS
+def plot_kAB_Gthresh(direction='AB'):
+    """plot kSSAB, kNGTAB as a function of Gthresh, and the exact kNGT
     for two different definitions of products and reactants."""
-    df = pd.read_csv('csvs/rates_ABBA_1inA_1inB.csv')
+    df = pd.read_csv('csvs/rates_regroupfree.csv')
     df2 = df.set_index('T')
-    df3 = pd.read_csv('csvs/rates_ABBA_5inA_395inB.csv')
-    df3 = df3.set_index('T')
     for temp, vals in df2.groupby('T'):
-        vals2 = df3.loc[temp]
         nrgthreshs = np.array(vals['Gthresh']).astype(float)
         kSSs = np.array(vals[f'kSS{direction}']).astype(float)
-        kNSSs = np.array(vals[f'kNSS{direction}']).astype(float)
-        kNSSexact = np.array(vals[f'kNSSexact{direction}']).astype(float)
+        kNGTs = np.array(vals[f'k{direction}']).astype(float)
+        kNGTexact = np.array(vals[f'kNGTexact{direction}']).astype(float)
         fig, ax = plt.subplots()
         colors = sns.color_palette()
         plt.plot(nrgthreshs, kSSs, label=f'kSS{direction}', color=colors[0], markersize=2)
-        plt.plot(nrgthreshs, vals2[f'kSS{direction}'],'--',
-                 label='kSS_5inA',
-                 color=colors[0])
-        plt.plot(nrgthreshs, kNSSs, label=f'kNSS{direction}',
+        plt.plot(nrgthreshs, kNGTs, label=f'k{direction}',
                     color=colors[1], markersize=2)
-        plt.plot(nrgthreshs, vals2[f'kNSS{direction}'], '--',
-                 label='kNSS_5inA',
-                 color=colors[1])
-        plt.plot(nrgthreshs, kNSSexact,
-                    label=f'kNSSexact{direction}', color=colors[2])
-        plt.plot(nrgthreshs,
-                 vals2[f'kNSSexact{direction}'], '--',
-                 label='kNSSexact_5inA',
-                 color=colors[2])
+        plt.plot(nrgthreshs, kNGTexact,
+                    label=f'kNGTexact{direction}', color=colors[2])
         plt.xlabel(r'$G_{thresh}$')
         plt.ylabel(f'$k_{{direction}}$')
         plt.title(f'T={temp}')
         plt.legend()
         fig.tight_layout()
-        plt.savefig(f'k{direction}_Gthresh_T{temp}.png')
+        plt.savefig(f'kNGT{direction}_Gthresh_T{temp}.png')
 
 def plot_kNSS_temp(direction='BA'):
     """Plot the exact kNSS as a function of temperature for different
