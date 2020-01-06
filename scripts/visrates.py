@@ -9,8 +9,9 @@ from matplotlib.legend import Legend
 import seaborn as sns
 sns.set()
 import numpy as np
+import scipy
 
-params = {'axes.edgecolor': 'black', 'axes.grid': True, 'axes.titlesize': 20.0,
+params = {'axes.edgecolor': 'black', 'axes.facecolor':'white', 'axes.grid': False, 'axes.titlesize': 20.0,
           'axes.linewidth': 0.75, 'backend': 'pdf','axes.labelsize':
           18,'legend.fontsize': 18,
           'xtick.labelsize': 18,'ytick.labelsize': 18,'text.usetex':
@@ -24,29 +25,50 @@ params = {'axes.edgecolor': 'black', 'axes.grid': True, 'axes.titlesize': 20.0,
 
 plt.rcParams.update(params)
 
-def plot_kAB_Gthresh(direction='AB'):
+def plot_kAB_Gthresh(temp, direction='AB'):
     """plot kSSAB, kNGTAB as a function of Gthresh, and the exact kNGT
     for two different definitions of products and reactants."""
-    df = pd.read_csv('csvs/rates_regroupfree.csv')
-    df2 = df.set_index('T')
-    for temp, vals in df2.groupby('T'):
-        nrgthreshs = np.array(vals['Gthresh']).astype(float)
-        kSSs = np.array(vals[f'kSS{direction}']).astype(float)
-        kNGTs = np.array(vals[f'k{direction}']).astype(float)
-        kNGTexact = np.array(vals[f'kNGTexact{direction}']).astype(float)
-        fig, ax = plt.subplots()
-        colors = sns.color_palette()
-        plt.plot(nrgthreshs, kSSs, label=f'kSS{direction}', color=colors[0], markersize=2)
-        plt.plot(nrgthreshs, kNGTs, label=f'k{direction}',
-                    color=colors[1], markersize=2)
-        plt.plot(nrgthreshs, kNGTexact,
-                    label=f'kNGTexact{direction}', color=colors[2])
-        plt.xlabel(r'$G_{thresh}$')
-        plt.ylabel(f'$k_{{direction}}$')
-        plt.title(f'T={temp}')
-        plt.legend()
-        fig.tight_layout()
-        plt.savefig(f'kNGT{direction}_Gthresh_T{temp}.png')
+    df = pd.read_csv('csvs/rates_regroupfree_ABsize.csv')
+    df = df.set_index(['T', 'numInA', 'numInB'])
+    df = df.xs(temp)
+    #plot kSSAB, kNGTAB for 5inA and 395inB vs. 1inA, 1inB
+    fig, ax = plt.subplots()
+    colors = sns.color_palette()
+    nrgthreshs = df.loc[1,1]['Gthresh']
+    plt.plot(nrgthreshs, df.loc[5,395][f'kSS{direction}'], label=f'kSS{direction}_395inB', color=colors[0])
+    plt.plot(nrgthreshs, df.loc[1,1][f'kSS{direction}'], '--',color=colors[0],
+              label=f'kSS{direction}_1inB')
+    plt.plot(nrgthreshs, df.loc[5,395][f'k{direction}'], label=f'k{direction}_395inB',
+                color=colors[1])
+    plt.plot(nrgthreshs, df.loc[1,1][f'k{direction}'], '--', color=colors[1],
+             label=f'k{direction}_1inB')
+    plt.plot(nrgthreshs, df.loc[1,1][f'kNGTexact{direction}'],
+                label=f'kNGTexact{direction}', color=colors[2])
+    #plt.plot(nrgthreshs, df.loc[5,395][f'kNGTexact{direction}'],
+    #         color=colors[2])
+    plt.xlabel(r'$G_{thresh}$')
+    plt.ylabel(f'k{direction}')
+    plt.title(f'T={temp:.2f}')
+    plt.legend()
+    fig.tight_layout()
+    plt.savefig(f'kNGT{direction}_Gthresh_T{temp:.2f}_diffAB.png')
+
+    #also plot number of products vs. Gthresh
+    fig, ax = plt.subplots()
+    ax.plot(nrgthreshs, df.loc[1,1]['regroupedA'], 'r', label='1 in A')
+    ax.plot(nrgthreshs, df.loc[5,395]['regroupedA'], 'r--', label='5 in A')
+    plt.legend()
+    plt.title(f'Regrouped A, T={temp:.2f}')
+    fig.tight_layout()
+    plt.savefig(f'regroupedA_vs_Gthresh_T{temp:.2f}.png')
+    #and for reactants
+    fig, ax = plt.subplots()
+    ax.plot(nrgthreshs, df.loc[1,1]['regroupedB'], 'b', label='1 in B')
+    ax.plot(nrgthreshs, df.loc[5,395]['regroupedB'], 'b--', label='395 in B')
+    plt.legend()
+    plt.title(f'Regrouped B, T={temp:.2f}')
+    fig.tight_layout()
+    plt.savefig(f'regroupedB_vs_Gthresh_T{temp:.2f}.png')
 
 def plot_kNSS_temp(direction='BA'):
     """Plot the exact kNSS as a function of temperature for different
@@ -74,7 +96,7 @@ def plot_kNSS_temp(direction='BA'):
 def plot_NGTrates(direction='AB', arrhenius=True):
     """ Plot kSS, kNSS, and the true kNGT rate constant as a function of
     temperature, varying the number of states in the B set. """
-    df = pd.read_csv('csvs/rates_kNGT_ABscan.csv')
+    df = pd.read_csv('csvs/rates_kNGT_ABscan2.csv')
     num_ABstates = len(np.unique(df['numInB']))
     colors = sns.color_palette("GnBu_d", num_ABstates)
     j = 0
@@ -89,21 +111,17 @@ def plot_NGTrates(direction='AB', arrhenius=True):
         if j==0:
             linestyles += ax.plot(temps, vals[f'kSS{direction}'], ':',
                                   color='k')
-                    #label='kSS')
             linestyles += ax.plot(temps, vals[f'kNSS{direction}'], '--',
                                   color='k')
-                    #label='kNSS')
             linestyles += ax.plot(temps, vals[f'k{direction}'], '-',
                                   color='k')
-                    #label=f'kNGT')
         ax.plot(temps, vals[f'kSS{direction}'], ':',color=colors[j])
-                #label=None)
         ax.plot(temps, vals[f'kNSS{direction}'], '--', color=colors[j])
-                #label=None)
-        linecolors += ax.plot(temps, vals[f'k{direction}'], '-',
+        legendline = ax.plot(temps, vals[f'k{direction}'], '-',
                               color=colors[j])
-                #label=f'{id[1]} in B')
-        Blabels.append(f'{id[1]} in B')
+        if j in [0, 9, 99, 299, 394]:
+            linecolors += legendline
+            Blabels.append(f'{id[1]} in B')
         j += 1
     if arrhenius is True:
         plt.xlabel(r'$1/k_BT$')
@@ -116,9 +134,39 @@ def plot_NGTrates(direction='AB', arrhenius=True):
     ax.add_artist(leg)
     fig.tight_layout()
     if arrhenius is True:
-        plt.savefig(f'plots/kNGT{direction}_scanB_temp_arrhenius.png')
+        plt.savefig(f'plots/kNGT{direction}_scanB2_temp_arrhenius.png')
     else:
-        plt.savefig(f'plots/kNGT{direction}_scanB_temp.png')
+        plt.savefig(f'plots/kNGT{direction}_scanB2_temp.png')
+
+def plot_NGTrates_slopes(dir='AB'):
+    """Plot the slope of the arrhenius plot of rate vs. 1/kBT vs the number
+    of minima in the B state."""
+    df = pd.read_csv('csvs/rates_kNGT_ABscan2.csv')
+    numInB = np.unique(df['numInB'])
+    print(numInB.shape)
+    slopeskSS = []
+    slopeskNSS = []
+    slopeskNGT = []
+    colors = sns.color_palette("Set2")
+    for id, vals in df.groupby(['numInA','numInB']):
+        temps = 1./vals['T']
+        slopeskSS.append(scipy.stats.linregress(temps, vals[f'kSS{dir}'])[0])
+        slopeskNSS.append(scipy.stats.linregress(temps, vals[f'kNSS{dir}'])[0])
+        slopeskNGT.append(scipy.stats.linregress(temps, vals[f'k{dir}'])[0])
+    fig, ax = plt.subplots()
+    print(np.array(slopeskSS).shape)
+    ax.plot(numInB, slopeskSS, ':', color=colors[0], label=f'kSS{dir}')
+    ax.plot(numInB, slopeskNGT, '-', color=colors[2], label=f'kNGT{dir}')
+    ax.plot(numInB, slopeskNSS, '--', color=colors[1], label=f'kNSS{dir}')
+    plt.xlabel('Minima in B')
+    plt.ylabel('slope of arrhenius plot')
+    if dir=='BA':
+        plt.ylim([-8.0*10**-9, -7.6*10**-9])   
+    if dir=='AB':
+        plt.ylim([-2.5*10**-9, 0])
+    plt.legend()
+    fig.tight_layout()
+    plt.savefig(f'plots/kNGT{dir}_slopes_numInB2.pdf')
 
 def plot_kNSS_difference():
 
