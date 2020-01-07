@@ -27,8 +27,17 @@ plt.rcParams.update(params)
 
 def plot_kAB_Gthresh(temp, direction='AB'):
     """plot kSSAB, kNGTAB as a function of Gthresh, and the exact kNGT
-    for two different definitions of products and reactants."""
+    for two different definitions of products and reactants.
+    
+    Parameters
+    ----------
+    temp : float .2f
+        temperature that REGROUPFREE was run at
+
+    """
     df = pd.read_csv('csvs/rates_regroupfree_ABsize.csv')
+    temps = [float(f'{temp:.2f}') for temp in df['T']]
+    df['T'] = temps
     df = df.set_index(['T', 'numInA', 'numInB'])
     df = df.xs(temp)
     #plot kSSAB, kNGTAB for 5inA and 395inB vs. 1inA, 1inB
@@ -51,24 +60,24 @@ def plot_kAB_Gthresh(temp, direction='AB'):
     plt.title(f'T={temp:.2f}')
     plt.legend()
     fig.tight_layout()
-    plt.savefig(f'kNGT{direction}_Gthresh_T{temp:.2f}_diffAB.png')
+    plt.savefig(f'plots/kNGT{direction}_Gthresh_T{temp:.2f}_diffAB.png')
 
     #also plot number of products vs. Gthresh
     fig, ax = plt.subplots()
-    ax.plot(nrgthreshs, df.loc[1,1]['regroupedA'], 'r', label='1 in A')
-    ax.plot(nrgthreshs, df.loc[5,395]['regroupedA'], 'r--', label='5 in A')
+    ax.plot(nrgthreshs, df.loc[1,1]['regroupedA'], 'r--', label='1 in A')
+    ax.plot(nrgthreshs, df.loc[5,395]['regroupedA'], 'r', label='5 in A')
     plt.legend()
     plt.title(f'Regrouped A, T={temp:.2f}')
     fig.tight_layout()
-    plt.savefig(f'regroupedA_vs_Gthresh_T{temp:.2f}.png')
+    plt.savefig(f'plots/regroupedA_vs_Gthresh_T{temp:.2f}.png')
     #and for reactants
     fig, ax = plt.subplots()
-    ax.plot(nrgthreshs, df.loc[1,1]['regroupedB'], 'b', label='1 in B')
-    ax.plot(nrgthreshs, df.loc[5,395]['regroupedB'], 'b--', label='395 in B')
+    ax.plot(nrgthreshs, df.loc[1,1]['regroupedB'], 'b--', label='1 in B')
+    ax.plot(nrgthreshs, df.loc[5,395]['regroupedB'], 'b', label='395 in B')
     plt.legend()
     plt.title(f'Regrouped B, T={temp:.2f}')
     fig.tight_layout()
-    plt.savefig(f'regroupedB_vs_Gthresh_T{temp:.2f}.png')
+    plt.savefig(f'plots/regroupedB_vs_Gthresh_T{temp:.2f}.png')
 
 def plot_kNSS_temp(direction='BA'):
     """Plot the exact kNSS as a function of temperature for different
@@ -96,7 +105,7 @@ def plot_kNSS_temp(direction='BA'):
 def plot_NGTrates(direction='AB', arrhenius=True):
     """ Plot kSS, kNSS, and the true kNGT rate constant as a function of
     temperature, varying the number of states in the B set. """
-    df = pd.read_csv('csvs/rates_kNGT_ABscan2.csv')
+    df = pd.read_csv('csvs/rates_kNGT_ABscan3_postregroup.csv')
     num_ABstates = len(np.unique(df['numInB']))
     colors = sns.color_palette("GnBu_d", num_ABstates)
     j = 0
@@ -134,14 +143,14 @@ def plot_NGTrates(direction='AB', arrhenius=True):
     ax.add_artist(leg)
     fig.tight_layout()
     if arrhenius is True:
-        plt.savefig(f'plots/kNGT{direction}_scanB2_temp_arrhenius.png')
+        plt.savefig(f'plots/kNGT{direction}_scanB3_temp_arrhenius.png')
     else:
-        plt.savefig(f'plots/kNGT{direction}_scanB2_temp.png')
+        plt.savefig(f'plots/kNGT{direction}_scanB3_temp.png')
 
 def plot_NGTrates_slopes(dir='AB'):
     """Plot the slope of the arrhenius plot of rate vs. 1/kBT vs the number
     of minima in the B state."""
-    df = pd.read_csv('csvs/rates_kNGT_ABscan2.csv')
+    df = pd.read_csv('csvs/rates_kNGT_ABscan3_postregroup.csv')
     numInB = np.unique(df['numInB'])
     print(numInB.shape)
     slopeskSS = []

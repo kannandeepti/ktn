@@ -21,6 +21,7 @@ MAXINA = 5
 MAXINB = 395
 INDEX_OF_KEYWORD_VALUE = 15
 PATHSAMPLE = "/home/dk588/svn/PATHSAMPLE/build/gfortran/PATHSAMPLE"
+disconnectionDPS = "/home/dk588/svn/DISCONNECT/source/disconnectionDPS"
 
 class ParsedPathsample(object):
     
@@ -125,8 +126,6 @@ class ParsedPathsample(object):
     def parse_output(self, outfile):
         """Searches for output of various subroutines of pathsample,
         including NGT, REGROUPFREE, and DIJKSTRA.
-
-        TODO: include the true NGT rate constant from disconnect sources
         """
         with open(outfile) as f:
             for line in f:
@@ -174,6 +173,104 @@ class ParsedPathsample(object):
                     group = [] #reset for next group
 
         return communities
+
+    def draw_disconnectivity_graph_AB(self, value, temp):
+        """Draw a Disconnectivity Graph colored by the minima in A and B after
+        running REGROUPFREE at threshold `value` and temperature `temp`."""
+        
+        #extract group assignments for this temperature/Gthresh
+        communities = self.parse_dumpgroups(self.path/f'minima_groups.{temp:.10f}',
+                                    grouptomin=True)
+        self.parse_minA_and_minB(self.path/f'min.A.regrouped.{temp:.10f}',
+                                    self.path/f'min.B.regrouped.{temp:.10f}')
+        #calculate the total number of minima in A and B
+        regroupedA = []
+        for a in self.minA: #0-indexed so add 1
+            #count the number of minima in that group, increment total count
+            regroupedA += communities[a+1]
+        sizeOfA = len(regroupedA)
+        regroupedB = []
+        for b in self.minB: #0-indexed so add 1
+            #count the number of minima in that group, increment total count
+            regroupedB += communities[b+1]
+        sizeOfB = len(regroupedB)
+        #write minima in A group to file for TRMIN
+        with open(self.path/f'minA.{value:.2f}.T{temp:.2f}.dat', 'w') as fi:
+            for min in regroupedA:
+                fi.write(f'{min}\n')
+        #write minima in B group to file for TRMIN
+        with open(self.path/f'minB.{value:.2f}.T{temp:.2f}.dat', 'w') as fi:
+            for min in regroupedB:
+                fi.write(f'{min}\n')
+        #modify dinfo file to include above files
+        #TODO: need to overwrite any existing TRMIN lines
+        os.system(f"mv {self.path/'dinfo'} {self.path/'dinfo.original'}")
+        #create a copy of the dinfo file 
+        with open(self.path/'dinfo', 'w') as newdinfo:
+            with open(self.path/'dinfo.original','r') as ogdinfo:
+                #copy over all lines from previous dinfo file except TRMIN
+                for line in ogdinfo:
+                    words = line.split()
+                    #change only the TRMIN line
+                    if words[0]=='TRMIN':
+                        newdinfo.write(f'TRMIN 2 10000 minA.{value:.2f}.T{temp:.2f}.dat ' +
+                                f'minB.{value:.2f}.T{temp:.2f}.dat\n')
+                    else:
+                        newdinfo.write(line)
+        #run disconnectionDPS
+        os.system(f"{disconnectionDPS}")
+        os.system("evince tree.ps")
+
+    def calc_inter_community_rates(self, C1, C2, temp):
+        """Calculate k_{C1<-C2} using NGT. Here, C1 and C2 are community IDs
+        (i.e. groups identified in DUMPGROUPS file from REGROUPFREE). This
+        function isolates the minima in C1 union C2 and the transition states
+        that connect them and feeds this subnetwork into PATHSAMPLE, using the
+        NGT keyword to calculate inter-community rates."""
+
+        #extract community assignments from REGROUPFREE
+        communities = self.parse_dumpgroups(self.path/f'minima_groups.{temp:.10f}',
+                                    grouptomin=True)
+        #minima to isolate
+        mintoisolate = communities[C1] + communities[C2]
+        print(mintoisolate)
+        #parse min.data and write a new min.data file with isolated minima
+        #also keep track of the new minIDs based on line numbers in new file
+        newmin = {}
+        j = 1
+        with open(self.path/'min.data.{C1}.{C2}', 'w') as newmindata:
+            with open(self.path/'min.data','r') as ogmindata:
+                #read min.data and check if line number is in C1 U C2
+                for i, line in enumerate(ogmindata, 1):
+                    if i in mintoisolate:
+                        #save mapping from old minIDs to new minIDs
+                        newmin[i] = j
+                        #NOTE: these min have new line numbers now
+                        #so will have to re-number min.A,min.B,ts.data
+                        newmindata.write(line)
+                        j += 1
+                    
+        print(newmin)
+        #exclude transition states in ts.data that connect minima not in C1/2
+        ogtsdata = pd.read_csv(self.path/'ts.data', sep='\s+', header=None,
+                               names=['nrg','fvibts','pointgroup','min1','min2','itx','ity','itz'])
+        newtsdata = []
+        for ind, row in ogtsdata.iterrows():
+            min1 = int(row['min1'])
+            min2 = int(row['min2'])
+            if min1 in mintoisolate and min2 in mintoisolate:
+                #copy line to new ts.data file, renumber min
+                modifiedrow = pd.DataFrame(row).transpose()
+                modifiedrow['min1'] = newmin[min1]
+                modifiedrow['min2'] = newmin[min2]
+                newtsdata.append(modifiedrow)
+        newtsdata = pd.concat(newtsdata)
+        #write new ts.data file
+        newtsdata.to_csv(self.path/f'ts.data.{C1}.{C2}',header=False, index=False, sep=' ')
+        #TODO: write new min.A/min.B files with nodes in C1 and C2 (using new
+        #minIDs of course)
+        #run PATHSAMPLE
+        #return rates
 
     def parse_input(self, pathdata):
         """Store keywords in pathdata as a dictionary.
@@ -223,9 +320,8 @@ class ScanPathsample(object):
         self.outbase = 'out' #prefix for pathsample output files
         if outbase is not None:
             self.outbase = outbase
-        self.outputs = {} #list of output dictionaries
 
-    def run_NGT_regrouped(self, Gthresh, temp, direction=None):
+    def run_NGT_regrouped(self, Gthresh, temp):
         """After each regrouping, calculate kNGT on regrouped minima."""
         #Rename regrouped files to min.A and min.B to pass as input to PATHSAMPLE
         files_to_modify = [self.path/'min.A', self.path/'min.B',
@@ -234,43 +330,45 @@ class ScanPathsample(object):
             os.system(f"mv {f} {f}.original")
             os.system(f"mv {f}.regrouped.{temp:.10f} {f}")
         #run NGT without regroup on regrouped minima
-        scan.parse.comment_input('REGROUPFREE')
-        scan.parse.comment_input('DUMPGROUPS')
-        scan.parse.write_input(scan.pathdatafile)
+        self.parse.comment_input('REGROUPFREE')
+        self.parse.comment_input('DUMPGROUPS')
+        self.parse.append_input('NGT', '0 T')
+        self.parse.write_input(scan.pathdatafile)
         outfile_noregroup = self.path/f'out.NGT.kNGT.{Gthresh:.2f}'
         os.system(f"{PATHSAMPLE} > {outfile_noregroup}")
-        scan.parse.parse_output(outfile=outfile_noregroup)
-        kAB = scan.parse.output['kAB']
-        kBA = scan.parse.output['kBA']
+        self.parse.parse_output(outfile=outfile_noregroup)
+        rates = {}
+        rates['kAB'] = self.parse.output['kAB']
+        rates['kBA'] = self.parse.output['kBA']
+        rates['kNSSAB'] = self.parse.output['kNSSAB']
+        rates['kNSSBA'] = self.parse.output['kNSSBA']
+        rates['kSSAB'] = self.parse.output['kSSAB']
+        rates['kSSBA'] = self.parse.output['kSSBA']
         #restore original file names
         for f in files_to_modify:
             os.system(f"mv {f} {f}.regrouped.{temp:.10f}")
             os.system(f"mv {f}.original {f}")
-        if direction is None:
-            return kAB, kBA
-        if direction is 'BA':
-            return kBA
-        if direction is 'AB':
-            return kAB
-    
-    def run_NGT_exact(self, direction=None):
+        return rates
+
+    def run_NGT_exact(self):
         #compare to exact kNSS calculation without free energy regrouping
         self.parse.comment_input('REGROUPFREE')
         self.parse.comment_input('DUMPGROUPS')
-        self.parse.write_input(scan.pathdatafile)
+        self.parse.append_input('NGT', '0 T')
+        self.parse.write_input(self.pathdatafile)
         outfile_noregroup = self.path/'out.NGT.NOREGROUP'
         os.system(f"{PATHSAMPLE} > {outfile_noregroup}")
-        scan.parse.parse_output(outfile=outfile_noregroup)
-        kAB = scan.parse.output['kAB']
-        kBA = scan.parse.output['kBA']
-        if direction is None:
-            return kAB, kBA
-        if direction is 'BA':
-            return kBA
-        if direction is 'AB':
-            return kAB
+        self.parse.parse_output(outfile=outfile_noregroup)
+        rates = {}
+        rates['kAB'] = self.parse.output['kAB']
+        rates['kBA'] = self.parse.output['kBA']
+        rates['kNSSAB'] = self.parse.output['kNSSAB']
+        rates['kNSSBA'] = self.parse.output['kNSSBA']
+        rates['kSSAB'] = self.parse.output['kSSAB']
+        rates['kSSBA'] = self.parse.output['kSSBA']
+        return rates
     
-    def scan_regroup(self, name, values, temp):
+    def scan_regroup(self, name, values, temp, NGTpostregroup=False):
         """Re-run PATHSAMPLE calculations for different `values` of the
         REGROUPFREE threshold. Extract output defined by outputkey and run NGT
         on the regrouped minima to get the SS/NSS rate constants."""
@@ -282,6 +380,8 @@ class ScanPathsample(object):
             #update input
             self.parse.append_input(name, value)
             self.parse.append_input('DUMPGROUPS', '')
+            if NGTpostregroup:
+                self.parse.comment_input('NGT')
             #overwrite pathdata file with updated input
             self.parse.write_input(self.pathdatafile)
             #run calculation 
@@ -290,14 +390,19 @@ class ScanPathsample(object):
             #parse output
             self.parse.parse_output(outfile=outfile)
             #store the output under the value it was run at
-            df['kSSAB'] = [self.parse.output['kSSAB']]
-            df['kSSBA'] = [self.parse.output['kSSBA']]
-            df['kAB'] = [self.parse.output['kAB']]
-            df['kBA'] = [self.parse.output['kBA']]
-            self.outputs[value] = self.parse.output
-           #kNSSAB, kNSSBA = self.run_NGT_regrouped(value, temp)
-           #df['kNSSAB'] = [kNSSAB]
-           #df['kNSSBA'] = [kNSSBA]
+            if NGTpostregroup:
+                rates = self.run_NGT_regrouped(value, temp)
+                df['kNSSAB'] = rates['kNSSAB']
+                df['kNSSBA'] = rates['kNSSBA']
+                df['kSSAB'] = rates['kSSAB']
+                df['kSSBA'] = rates['kSSBA']
+                df['kAB'] = rates['kAB']
+                df['kBA'] = rates['kBA']
+            else:
+                df['kSSAB'] = [self.parse.output['kSSAB']]
+                df['kSSBA'] = [self.parse.output['kSSBA']]
+                df['kAB'] = [self.parse.output['kAB']]
+                df['kBA'] = [self.parse.output['kBA']]
             df['Gthresh'] = [value]
             #extract group assignments for this temperature/Gthresh
             communities = self.parse.parse_dumpgroups(self.path/f'minima_groups.{temp:.10f}',
@@ -307,16 +412,16 @@ class ScanPathsample(object):
             ABparse.parse_minA_and_minB(self.path/f'min.A.regrouped.{temp:.10f}',
                                         self.path/f'min.B.regrouped.{temp:.10f}')
             #calculate the total number of minima in A and B
-            #TODO: color disconnectivity graph by regrouped A and B
-            sizeOfA = 0
+            regroupedA = []
             for a in ABparse.minA: #0-indexed so add 1
                 #count the number of minima in that group, increment total count
-                group_members = communities[a+1]
-                sizeOfA += len(group_members)
-            sizeOfB = 0
-            for b in ABparse.minB:
-                group_members = communities[b+1]
-                sizeOfB += len(group_members)
+                regroupedA += communities[a+1]
+            sizeOfA = len(regroupedA)
+            regroupedB = []
+            for b in ABparse.minB: #0-indexed so add 1
+                #count the number of minima in that group, increment total count
+                regroupedB += communities[b+1]
+            sizeOfB = len(regroupedB)
             df['regroupedA'] = sizeOfA
             df['regroupedB'] = sizeOfB
             dfs.append(df)
@@ -401,16 +506,18 @@ def scan_product_states(numinAs, numinBs, temps):
         scan.parse.write_minA_minB(scan.path/'min.A',scan.path/'min.B')
         scan.scan_temp('TEMPERATURE', temps)
         scan.remove_output()
+        print(f'Num in A: {numinAs[i]}, Num in B: {numinBs[i]}')
 
 if __name__=='__main__':
     #temps = np.arange(0.03, 0.16, 0.01)
-    temps = np.arange(0.04, 1.01, 0.01)
+    temps = np.arange(0.03, 1.01, 0.01)
     #numinBs = np.arange(1, 396, 1)
     #numinAs = np.tile(1, len(numinBs))
     #parse = ParsedPathsample('/scratch/dk588/databases/LJ38.2010/10000.minima/pathdata')
     #parse.sort_A_and_B(parse.path/'min.A.master',parse.path/'min.B.master', parse.path/'min.data')
     #os.system(f"{PATHSAMPLE} > test")
     #scan_product_states(numinAs, numinBs, temps)
+    """
     for temp in temps:
         suffix = 'regroupfree_ABsize'
         print(f'CALCULATING TEMPERATURE {temp}')
@@ -419,3 +526,6 @@ if __name__=='__main__':
         nrgthreshs = np.linspace(0.01, 3.0, 100)
         scan.scan_regroup('REGROUPFREE', nrgthreshs.tolist(), temp)
         scan.remove_output()
+    """
+    testDG = ParsedPathsample('/scratch/dk588/databases/LJ38.2010/10000.minima/clean/pathdata')
+    testDG.draw_disconnectivity_graph_AB(3.0, 0.1)
