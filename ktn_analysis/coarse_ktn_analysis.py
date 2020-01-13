@@ -584,6 +584,11 @@ class Ktn(object):
         assert abs(np.exp(tot_pi2)-1.) < 1.E-10
 
     def get_comm_stat_probs(self):
+        """ Community stationary probabilities :math:`\pi_{C_i}=\sum_{i \in
+        C_i} \pi_i` are calculated
+        by summing over the the stationary probabilities of the nodes :math:`i`
+        in the community.
+        """
         self.comm_pi_vec = [-float("inf")]*self.n_comms
         for node in self.nodelist:
             self.comm_pi_vec[node.comm_id] = np.log(np.exp(self.comm_pi_vec[node.comm_id]) + \
@@ -668,6 +673,8 @@ class Coarse_ktn(Ktn):
 
     def __init__(self,parent_ktn):
         if parent_ktn.__class__.__name__ != self.__class__.__bases__[0].__name__: raise AttributeError
+        # construct a KTN using parent class constructor with n_nodes = n_comms
+        # and n_edges = n_comms(n_comms - 1)/2, and None for communities
         super(Coarse_ktn,self).__init__(parent_ktn.n_comms,parent_ktn.n_comms*(parent_ktn.n_comms-1)/2,None)
         self.parent_ktn = parent_ktn
         self.construct_coarse_ktn

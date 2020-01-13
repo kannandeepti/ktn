@@ -32,8 +32,8 @@ class ParsedPathsample(object):
         self.numInB = 0 #number of minima in B
         self.minA = [] #IDs of minima in A set
         self.minB = [] #IDs of minima in B set
-        self.maxinA = maxinA #maximum allowed number of minima in A set
-        self.maxinB = maxinB #maximum allowed number of minima in B set
+        #self.maxinA = maxinA #maximum allowed number of minima in A set
+        #self.maxinB = maxinB #maximum allowed number of minima in B set
         #read in numInA, numInB, minA, minB from min.A and min.B files
         self.path = Path(pathdata).parent.absolute()
         self.parse_minA_and_minB(self.path/'min.A', self.path/'min.B')
@@ -145,6 +145,8 @@ class ParsedPathsample(object):
                     if words[0] == 'NGT>' and words[1]=='k(A<-B)=':
                         self.output['kAB'] = float(words[2])
                         self.output['kBA'] = float(words[4])
+                        #this is the last line we're interested in
+                        break
 
     def parse_dumpgroups(self, mingroupsfile, grouptomin=False):
         """Parse the `minima_groups.{temp}` file outputted by the DUMPGROUPS
@@ -203,7 +205,8 @@ class ParsedPathsample(object):
             for min in regroupedB:
                 fi.write(f'{min}\n')
         #modify dinfo file to include above files
-        #TODO: need to overwrite any existing TRMIN lines
+        #TODO: make sure min.data, ts.data specified.
+        #TODO: make sure TRMIN already specified in existing dinfo file
         os.system(f"mv {self.path/'dinfo'} {self.path/'dinfo.original'}")
         #create a copy of the dinfo file 
         with open(self.path/'dinfo', 'w') as newdinfo:
@@ -211,15 +214,64 @@ class ParsedPathsample(object):
                 #copy over all lines from previous dinfo file except TRMIN
                 for line in ogdinfo:
                     words = line.split()
+                    print(words)
                     #change only the TRMIN line
                     if words[0]=='TRMIN':
-                        newdinfo.write(f'TRMIN 2 10000 minA.{value:.2f}.T{temp:.2f}.dat ' +
+                        newdinfo.write(f'TRMIN 2 998 minA.{value:.2f}.T{temp:.2f}.dat ' +
                                 f'minB.{value:.2f}.T{temp:.2f}.dat\n')
                     else:
                         newdinfo.write(line)
         #run disconnectionDPS
         os.system(f"{disconnectionDPS}")
         os.system("evince tree.ps")
+
+    def read_communities(self, commdat):
+        """Read in a single column file called communities.dat where each line
+        is the community ID (zero-indexed) of the minima given by the line
+        numbenumber.
+        
+        Parameters
+        ----------
+        commdat : .dat file
+            single-column file containing community IDs of each minimum
+
+        Returns
+        -------
+        communities : dict
+            mapping from community ID (1-indexed) to minima ID (1-indexed)
+        """
+
+        communities = {}
+        with open(commdat, 'r') as f:
+            for minID, line in enumerate(f, 1):
+                groupID =  int(line) + 1
+                if groupID in communities:
+                    communities[groupID].append(minID)
+                else:
+                    communities[groupID] = [minID]
+        return communities
+
+    def write_communities(self, communities, commdat):
+        """ Write a single-column file `commdat` where each line is the
+        communitcommunity ID (zero-indexed) of the minima given by the line
+        number.
+
+        Parameters
+        ----------
+        communities : dict
+            mapping from minima ID (1-indexed) to community ID (1-indexed)
+        commdat : .dat file name
+            file to which to write communitiy assignments
+
+        """
+        commdat = Path(commdat)
+        if commdat.exists():
+            raise ValueError(f'The file {commdat} already exists. Write to a
+                             new file')
+        with open(commdat, 'w') as f:
+            for min in communities:
+                f.write(f'{communities[min] - 1}\n')
+
 
     def calc_inter_community_rates(self, C1, C2, temp):
         """Calculate k_{C1<-C2} using NGT. Here, C1 and C2 are community IDs
@@ -233,12 +285,11 @@ class ParsedPathsample(object):
                                     grouptomin=True)
         #minima to isolate
         mintoisolate = communities[C1] + communities[C2]
-        print(mintoisolate)
         #parse min.data and write a new min.data file with isolated minima
         #also keep track of the new minIDs based on line numbers in new file
         newmin = {}
         j = 1
-        with open(self.path/'min.data.{C1}.{C2}', 'w') as newmindata:
+        with open(self.path/f'min.data.{C1}.{C2}', 'w') as newmindata:
             with open(self.path/'min.data','r') as ogmindata:
                 #read min.data and check if line number is in C1 U C2
                 for i, line in enumerate(ogmindata, 1):
@@ -250,27 +301,90 @@ class ParsedPathsample(object):
                         newmindata.write(line)
                         j += 1
                     
-        print(newmin)
         #exclude transition states in ts.data that connect minima not in C1/2
         ogtsdata = pd.read_csv(self.path/'ts.data', sep='\s+', header=None,
                                names=['nrg','fvibts','pointgroup','min1','min2','itx','ity','itz'])
         newtsdata = []
+        noconnections = True #flag for whether C1 and C2 are disconnected
         for ind, row in ogtsdata.iterrows():
             min1 = int(row['min1'])
             min2 = int(row['min2'])
             if min1 in mintoisolate and min2 in mintoisolate:
+                # turn off noconnections flag as soon as one TS between C1 and
+                # C2 is found
+                if ((min1 in communities[C1] and min2 in communities[C2]) or
+                (min1 in communities[C2] and min2 in communities[C1])):
+                    noconnections = False
                 #copy line to new ts.data file, renumber min
                 modifiedrow = pd.DataFrame(row).transpose()
                 modifiedrow['min1'] = newmin[min1]
                 modifiedrow['min2'] = newmin[min2]
+                modifiedrow['pointgroup'] = int(modifiedrow['pointgroup'])
                 newtsdata.append(modifiedrow)
+        if noconnections or len(newtsdata)==0:
+            #no transition states between these minima, return 0
+            print(f"No transition states exist between communities {C1} and {C2}")
+            return 0.0, 0.0
         newtsdata = pd.concat(newtsdata)
         #write new ts.data file
         newtsdata.to_csv(self.path/f'ts.data.{C1}.{C2}',header=False, index=False, sep=' ')
-        #TODO: write new min.A/min.B files with nodes in C1 and C2 (using new
+        #write new min.A/min.B files with nodes in C1 and C2 (using new
         #minIDs of course)
+        numInC1 = len(communities[C1])
+        minInC1 = []
+        for min in communities[C1]:
+            minInC1.append(newmin[min] - 1)
+        numInC2 = len(communities[C2])
+        minInC2 = []
+        for j in communities[C2]:
+            minInC2.append(newmin[j] - 1)
+        self.minA = minInC1
+        self.minB = minInC2
+        self.numInA = numInC1
+        self.numInB = numInC2
+        self.write_minA_minB(self.path/f'min.A.{C1}', self.path/f'min.B.{C2}')
         #run PATHSAMPLE
-        #return rates
+        files_to_modify = [self.path/'min.A', self.path/'min.B',
+                           self.path/'min.data', self.path/'ts.data']
+        for f in files_to_modify:
+            os.system(f'mv {f} {f}.old')
+        os.system(f"cp {self.path}/min.A.{C1} {self.path}/min.A")
+        os.system(f"cp {self.path}/min.B.{C2} {self.path}/min.B")
+        os.system(f"cp {self.path}/min.data.{C1}.{C2} {self.path}/min.data")
+        os.system(f"cp {self.path}/ts.data.{C1}.{C2} {self.path}/ts.data")
+        outfile = self.path/f'out.{C1}.{C2}.T{temp}'
+        os.system(f"{PATHSAMPLE} > {outfile}")
+        #parse output
+        self.parse_output(outfile=outfile)
+        for f in files_to_modify:
+            os.system(f'mv {f}.old {f}')
+        #return rates k(C1<-C2), k(C2<-C1)
+        return self.output['kAB'], self.output['kBA']
+
+    def construct_coarse_rate_matrix(self, temp):
+        """ Calculate inter-community rate constants using communities defined
+        by minima_groups file at specified temperature. Returns a NxN rate
+        matrimatrix where N is the number of communities."""
+
+        #extract community assignments from REGROUPFREE
+        communities = self.parse_dumpgroups(self.path/f'minima_groups.{temp:.10f}',
+                                    grouptomin=True)
+        N = len(communities.keys())
+        print(N)
+        R = np.zeros((N,N))
+        for i in range(N):
+            for j in range(N):
+                if i < j:
+                    try:
+                        Rij, Rji = self.calc_inter_community_rates(i+1, j+1, temp)
+                    except:
+                        print(f'PATHSAMPLE errored out for communities {i} and {j}')
+                        continue
+                    R[i, j] = Rij
+                    R[j, i] = Rji
+        for i in range(N):
+            R[i, i] = -np.sum(R[:, i])
+        return R
 
     def parse_input(self, pathdata):
         """Store keywords in pathdata as a dictionary.
@@ -527,5 +641,8 @@ if __name__=='__main__':
         scan.scan_regroup('REGROUPFREE', nrgthreshs.tolist(), temp)
         scan.remove_output()
     """
-    testDG = ParsedPathsample('/scratch/dk588/databases/LJ38.2010/10000.minima/clean/pathdata')
-    testDG.draw_disconnectivity_graph_AB(3.0, 0.1)
+    #testDG = ParsedPathsample('/scratch/dk588/databases/3h_pot/pathdata')
+    #testDG.draw_disconnectivity_graph_AB(1.5, 0.6)
+    test = ParsedPathsample('/scratch/dk588/databases/3h_pot/pathdata')
+    R = test.construct_coarse_rate_matrix(0.6)
+    print(R)
