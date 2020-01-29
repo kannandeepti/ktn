@@ -261,16 +261,16 @@ class ParsedPathsample(object):
         communities : dict
             mapping from minima ID (1-indexed) to community ID (1-indexed)
         commdat : .dat file name
-            file to which to write communitiy assignments
+            file to which to write communitiy assignments (0-indexed)
 
         """
         commdat = Path(commdat)
         if commdat.exists():
-            raise ValueError(f'The file {commdat} already exists. Write to a
-                             new file')
+            raise ValueError(f'The file {commdat} already exists. Write to a new file')
+        nnodes = len(communities) #number of keys = number of minima
         with open(commdat, 'w') as f:
-            for min in communities:
-                f.write(f'{communities[min] - 1}\n')
+            for min in range(1, nnodes+1):
+                f.write(f'{np.array(communities[min]) - 1}\n')
 
 
     def calc_inter_community_rates(self, C1, C2, temp):
@@ -343,6 +343,8 @@ class ParsedPathsample(object):
         self.numInA = numInC1
         self.numInB = numInC2
         self.write_minA_minB(self.path/f'min.A.{C1}', self.path/f'min.B.{C2}')
+        self.append_input('NGT', '0 T')
+        self.write_input(self.path/'pathdata')
         #run PATHSAMPLE
         files_to_modify = [self.path/'min.A', self.path/'min.B',
                            self.path/'min.data', self.path/'ts.data']
@@ -434,6 +436,80 @@ class ScanPathsample(object):
         self.outbase = 'out' #prefix for pathsample output files
         if outbase is not None:
             self.outbase = outbase
+
+    def dump_rates_full_network(self):
+        """ Dump rate matrix K_ij from full network as well as stationary
+        probabilities p_ij using DUMP_INFOMAP keyword.
+        
+        Note
+        ----
+        Make sure that any existing `stat_prob.dat` and `ts_weights.dat` files
+        are deleted from the self.path directory.
+        """
+        files_to_write = [self.path/'ts_weights.dat',
+                          self.path/'stat_prob.dat']
+        #rename any pre-exisiting ts_weights.dat and stat_prob.dat files
+        for f in files_to_write:
+            if f.exists():
+                os.system(f'mv {f} {f}.old')
+        #remove any unnecessary keywords
+        self.parse.comment_input('REGROUPFREE')
+        self.parse.comment_input('DUMPGROUPS')
+        self.parse.comment_input('NGT') 
+        #call dump_infomap to obtain Daniel's files
+        self.parse.append_input('DUMPINFOMAP', '')
+        temp = float(self.parse.input['TEMPERATURE'])
+        self.parse.write_input(self.pathdatafile)
+        outfile = self.path/f'out.dumpinfo.{temp:.2f}'
+        os.system(f"{PATHSAMPLE} > {outfile}")
+        #also write a ts_weights.dat file using info from ts.data
+        tsdata = np.loadtxt(self.path/'ts.data')
+        tsdata = tsdata[:,[3,4]].astype('int') #isolating minima ts connects
+        np.savetxt(self.path/f'ts_conns_T{temp:.2f}.dat', tsdata, fmt='%d')
+        #rename the files something useful
+        for f in files_to_write:
+            os.system(f'mv {f} {self.path}/{f.stem}_T{temp:.2f}.dat')
+
+    def dump_rates_from_local_equilibrium_approx(self, temp):
+        """ Dump out the rates and stationary probabilities of a coarse-grained
+        network resulting from the REGROUPFREE routine. Should write out a
+        ts_weights.dat and stat_prob.dat file (consistent with Daniel's
+        formats).
+        TODO: debug DUMPINFOMAP keyword."""
+
+        files_to_write = [self.path/'ts_weights.dat',
+                          self.path/'stat_prob.dat']
+        #rename any pre-exisiting ts_weights.dat and stat_prob.dat files
+        for f in files_to_write:
+            if f.exists():
+                os.system(f'mv {f} {f}.old')
+        #Rename regrouped files to min.A and min.B to pass as input to PATHSAMPLE
+        files_to_modify = [self.path/'min.A', self.path/'min.B',
+                           self.path/'min.data', self.path/'ts.data']
+        for f in files_to_modify:
+            os.system(f"mv {f} {f}.original")
+            os.system(f"mv {f}.regrouped.{temp:.10f} {f}")
+        # not interested in running NGT or REGROUPFREE, just want
+        # PATHSAMPLE to dump kij rates and pi_i from network
+        self.parse.comment_input('REGROUPFREE')
+        self.parse.comment_input('DUMPGROUPS')
+        self.parse.comment_input('NGT') 
+        self.parse.append_input('DUMPINFOMAP', '') #to obtain Daniel's files
+        self.parse.write_input(self.pathdatafile)
+        outfile = self.path/f'out.dumpinfo.LEA.{temp:.2f}'
+        os.system(f"{PATHSAMPLE} > {outfile}")
+        #rename the files something useful
+        for f in files_to_write:
+            os.system(f'mv {f} {self.path}/{f.stem}_LEA_T{temp:.2f}.dat')
+        #also write a ts_weights.dat file using info from ts.data
+        tsdata = np.loadtxt(self.path/'ts.data')
+        tsdata = tsdata[:,[3,4]].astype('int') #isolating minima ts connects
+        np.savetxt(self.path/f'ts_conns_LEA_T{temp:.2f}.dat', tsdata, fmt='%d')
+            
+        #return files to original names
+        for f in files_to_modify:
+            os.system(f"mv {f} {f}.regrouped.{temp:.10f}")
+            os.system(f"mv {f}.original {f}")
 
     def run_NGT_regrouped(self, Gthresh, temp):
         """After each regrouping, calculate kNGT on regrouped minima."""
@@ -643,6 +719,6 @@ if __name__=='__main__':
     """
     #testDG = ParsedPathsample('/scratch/dk588/databases/3h_pot/pathdata')
     #testDG.draw_disconnectivity_graph_AB(1.5, 0.6)
-    test = ParsedPathsample('/scratch/dk588/databases/3h_pot/pathdata')
-    R = test.construct_coarse_rate_matrix(0.6)
-    print(R)
+    #test = ParsedPathsample('/scratch/dk588/databases/3h_pot/pathdata')
+    #R = test.construct_coarse_rate_matrix(0.6)
+    #print(R)

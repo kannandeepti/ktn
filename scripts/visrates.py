@@ -79,6 +79,32 @@ def plot_kAB_Gthresh(temp, direction='AB'):
     fig.tight_layout()
     plt.savefig(f'plots/regroupedB_vs_Gthresh_T{temp:.2f}.png')
 
+def plot_kRG_kNGT_ratio(temps_to_plot):
+    temps_to_plot = 1./temps_to_plot
+    df = pd.read_csv('csvs/rates_regroupfree_ABsize.csv')
+    temps = [float(f'{temp:.2f}') for temp in df['T']]
+    df['T'] = temps
+    df = df.set_index(['T', 'numInA', 'numInB'])
+    fig, ax = plt.subplots()
+    colors = sns.color_palette()
+    for i, temp in enumerate(temps_to_plot):
+        df2 = df.xs(temp)
+        #plot kSSAB, kNGTAB for 5inA and 395inB vs. 1inA, 1inB
+        nrgthreshs = df2.loc[5,395]['Gthresh']
+        #ax.plot(nrgthreshs,
+        #         df2.loc[5,395]['kAB']/df2.loc[5,395][f'kNGTexactAB'], 
+        #         label=f'T{temp}',
+        #         color=colors[i])
+        ax.plot(nrgthreshs, df2.loc[5,395][f'kBA']/df2.loc[5,395][f'kNGTexactBA'],  
+                 color=colors[i],
+                 label=f'T{temp}')
+    plt.xlabel(r'$\Delta G^{RG}$')
+    plt.ylabel(r'$k^{F RG}_{BA} / k^{F}_{BA}$')
+    plt.legend()
+    fig.tight_layout()
+    #plt.savefig(f'plots/kRG_kNGT_ratio_Gthresh.png')
+
+
 def plot_kNSS_temp(direction='BA'):
     """Plot the exact kNSS as a function of temperature for different
     definitions of products and reactants."""
