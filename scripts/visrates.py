@@ -128,10 +128,60 @@ def plot_kNSS_temp(direction='BA'):
     plt.savefig(f'plots/kNSS{direction}_temp_diffAB.png')
     return np.array(kNSS1), np.array(kNSS2)
 
-def plot_NGTrates(direction='AB', arrhenius=True):
+def plot_NGT_arrhenius(thresh):
+    """Compare rates from LEA vs. HS vs. NGT at a regrouping threshold."""
+    df = pd.read_csv('csvs/rates_Gthresh_temp_scan_LEA_HS_NGT.csv')
+    df = df.set_index('Gthresh')
+    #first plot A<-B direction
+    fig, ax = plt.subplots()
+    colors = sns.color_palette("Set2", 3)
+    df2 = df.xs(thresh)
+    #first plot LEA at all temperatures (since it works at all)
+    temps = 1./df2['T']
+    ax.plot(temps, np.log(df2[f'kAB_LEA']), '-s', label='LEA',
+                            color=colors[0], linewidth=1) 
+    #then only plot NGT for temperatures that are not NaN
+    df2NGT = df2[-df2['kAB_NGT'].isna()]
+    ax.plot(1./df2NGT['T'], np.log(df2NGT[f'kAB_NGT']), '-o', label='MFPT',
+                            color=colors[1], linewidth=1) 
+    #then only plot HS for temperatures that are not NaN
+    df2HS = df2[-df2['kAB_HS'].isna()]
+    ax.plot(1./df2HS['T'], np.log(df2HS[f'kAB_HS']), '-o', label='H-S',
+                            color=colors[2], linewidth=1)
+    ax.plot(1./df2['T'], np.log(df2[f'kNGTexactAB']), '-^', color='k', linewidth=1, 
+                                label=r'$k^F_{A\leftarrow B}$') 
+    plt.xlabel('1/T')
+    plt.ylabel(r'ln($k^{F\hspace{1} CG}_{A\leftarrow B}$)')
+    plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+    plt.legend()
+    fig.tight_layout()
+    plt.savefig(f'plots/modelA_kLEA_kNGT_kHS_arrhenius_Gthresh{thresh}_AB.pdf')
+
+    #next plot B<-A direction
+    fig, ax = plt.subplots()
+    ax.plot(temps, np.log(df2[f'kBA_LEA']), '-s', label='LEA',
+                            color=colors[0], linewidth=1) 
+    #then only plot NGT for temperatures that are not NaN
+    df2NGT = df2[-df2['kBA_NGT'].isna()]
+    ax.plot(1./df2NGT['T'], np.log(df2NGT[f'kBA_NGT']), '-o', label='MFPT',
+                            color=colors[1], linewidth=1) 
+    #then only plot HS for temperatures that are not NaN
+    df2HS = df2[-df2['kBA_HS'].isna()]
+    ax.plot(1./df2HS['T'], np.log(df2HS[f'kBA_HS']), '-o', label='H-S',
+                            color=colors[2], linewidth=1)
+    ax.plot(1./df2['T'], np.log(df2[f'kNGTexactBA']), '-^', color='k', linewidth=1, 
+                                label=r'$k^F_{B\leftarrow A}$') 
+    plt.xlabel('1/T')
+    plt.ylabel(r'ln($k^{F\hspace{1} CG}_{B\leftarrow A}$)')
+    plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+    plt.legend()
+    fig.tight_layout()
+    plt.savefig(f'plots/modelA_kLEA_kNGT_kHS_arrhenius_Gthresh{thresh}_BA.pdf')
+
+def plot_NGTrates_minInB(direction='AB', arrhenius=True):
     """ Plot kSS, kNSS, and the true kNGT rate constant as a function of
     temperature, varying the number of states in the B set. """
-    df = pd.read_csv('csvs/rates_kNGT_ABscan3_postregroup.csv')
+    df = pd.read_csv('csvsk/rates_kNGT_ABscan3_postregroup.csv')
     num_ABstates = len(np.unique(df['numInB']))
     colors = sns.color_palette("GnBu_d", num_ABstates)
     j = 0
