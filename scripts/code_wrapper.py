@@ -145,6 +145,9 @@ class ParsedPathsample(object):
                     if words[0] == 'NGT>' and words[1]=='k(A<-B)=':
                         self.output['kAB'] = float(words[2])
                         self.output['kBA'] = float(words[4])
+                    if words[0] == 'NGT>' and words[1]=='MFPT(A<-B)=':
+                        self.output['MFPTAB'] = float(words[2])
+                        self.output['MFPTBA'] = float(words[4])
                         #this is the last line we're interested in
                         break
 
@@ -271,6 +274,40 @@ class ParsedPathsample(object):
         with open(commdat, 'w') as f:
             for min in range(1, nnodes+1):
                 f.write(f'{np.array(communities[min]) - 1}\n')
+
+    def calc_community_MFPTs(self, communities, temp):
+        """ Calculate a matrix of MFPTs between communities."""
+
+        files_to_modify = [self.path/'min.A', self.path/'min.B']
+        for f in files_to_modify:
+            os.system(f'mv {f} {f}.original')
+
+        N = len(communities)
+        MFPT = np.zeros((N,N))
+        for ci in range(N):
+            for cj in range(N):
+                if ci < cj:
+                    self.minA = np.array(communities[ci+1]) - 1
+                    self.numInA = len(communities[ci+1])
+                    self.minB = np.array(communities[cj+1]) - 1
+                    self.numInB = len(communities[cj+1])
+                    self.write_minA_minB(self.path/'min.A', self.path/'min.B')
+                    self.append_input('NGT', '0 T')
+                    self.append_input('TEMPERATURE', f'{temp}')
+                    self.write_input(self.path/'pathdata')
+                    #run PATHSAMPLE
+                    outfile = self.path/f'out.{ci+1}.{cj+1}.T{temp}'
+                    os.system(f"{PATHSAMPLE} > {outfile}")
+                    #parse output
+                    self.parse_output(outfile=outfile)
+                    MFPT[ci, cj] = 1./self.output['kAB']
+                    MFPT[cj, ci] = 1./self.output['kBA']
+
+        #restore original min.A and min.B files
+        for f in files_to_modify:
+            os.system(f'mv {f}.original {f}')
+
+        return MFPT
 
 
     def calc_inter_community_rates(self, C1, C2, temp):
@@ -437,7 +474,7 @@ class ScanPathsample(object):
         if outbase is not None:
             self.outbase = outbase
 
-    def dump_rates_full_network(self):
+    def dump_rates_full_network(self, temp=None):
         """ Dump rate matrix K_ij from full network as well as stationary
         probabilities p_ij using DUMP_INFOMAP keyword.
         
@@ -458,7 +495,10 @@ class ScanPathsample(object):
         self.parse.comment_input('NGT') 
         #call dump_infomap to obtain Daniel's files
         self.parse.append_input('DUMPINFOMAP', '')
-        temp = float(self.parse.input['TEMPERATURE'])
+        if temp is None:
+            temp = float(self.parse.input['TEMPERATURE'])
+        else:
+            self.parse.append_input('TEMPERATURE', f'{temp}')
         self.parse.write_input(self.pathdatafile)
         outfile = self.path/f'out.dumpinfo.{temp:.2f}'
         os.system(f"{PATHSAMPLE} > {outfile}")
@@ -589,10 +629,8 @@ class ScanPathsample(object):
                 df['kAB'] = rates['kAB']
                 df['kBA'] = rates['kBA']
             else:
-                df['kSSAB'] = [self.parse.output['kSSAB']]
-                df['kSSBA'] = [self.parse.output['kSSBA']]
-                df['kAB'] = [self.parse.output['kAB']]
-                df['kBA'] = [self.parse.output['kBA']]
+                df['kAB_LEA'] = [self.parse.output['kAB']]
+                df['kBA_LEA'] = [self.parse.output['kBA']]
             df['Gthresh'] = [value]
             #extract group assignments for this temperature/Gthresh
             communities = self.parse.parse_dumpgroups(self.path/f'minima_groups.{temp:.10f}',
@@ -612,17 +650,30 @@ class ScanPathsample(object):
                 #count the number of minima in that group, increment total count
                 regroupedB += communities[b+1]
             sizeOfB = len(regroupedB)
+            df['ncomms'] = len(communities)
             df['regroupedA'] = sizeOfA
             df['regroupedB'] = sizeOfB
             dfs.append(df)
+            # rename files to also include Gthresh in filename
+            files_to_rename = [self.path/f'minima_groups.{temp:.10f}',
+                               self.path/f'ts_groups.{temp:.10f}',
+                               self.path/f'min.A.regrouped.{temp:.10f}',
+                               self.path/f'min.B.regrouped.{temp:.10f}',
+                               self.path/f'min.data.regrouped.{temp:.10f}',
+                               self.path/f'ts.data.regrouped.{temp:.10f}']
+            for f in files_to_rename:
+                dir_name = Path(self.path/f'G{value:.1f}')
+                if not dir_name.is_dir():
+                    dir_name.mkdir()
+                os.system(f'mv {f} {dir_name}/{f.name}.G{value:.1f}')
             print(f"Computed rate constants for regrouped minima with threshold {value}") 
         bigdf = pd.concat(dfs, ignore_index=True, sort=False)
         bigdf['T'] = temp
         bigdf['numInA'] = self.parse.numInA
         bigdf['numInB'] = self.parse.numInB
-        kexact_AB, kexact_BA = self.run_NGT_exact()
-        bigdf['kNGTexactAB'] = kexact_AB
-        bigdf['kNGTexactBA'] = kexact_BA
+        rates = self.run_NGT_exact()
+        bigdf['kNGTexactAB'] = rates['kAB']
+        bigdf['kNGTexactBA'] = rates['kBA']
         #if file exists, append to existing data
         if csv.is_file():
             olddf = pd.read_csv(csv)
@@ -698,14 +749,37 @@ def scan_product_states(numinAs, numinBs, temps):
         scan.remove_output()
         print(f'Num in A: {numinAs[i]}, Num in B: {numinBs[i]}')
 
+def scan_Gthresh_and_temp(temps, nrgthreshs):
+    """ Calculate rates at different free energy thresholds for regrouping and
+    at different temperatures. """
+
+    suffix = 'Gthresh_temp_scan'
+    #olddf = pd.read_csv(f'rates_{suffix}.csv')
+    #olddf = olddf.set_index(['T',')
+    for temp in temps:
+        #if temp in olddf.index:
+        #    continue
+        scan = ScanPathsample('./pathdata', suffix=suffix)
+        scan.parse.append_input('TEMPERATURE', temp)
+        scan.scan_regroup('REGROUPFREE', nrgthreshs, temp)
+        scan.remove_output()
+
+def dump_ktn_info_scan(temps, nrgthreshs):
+    """Dumpt all .dat files based on temp/Gthresh scan."""
+    scan = ScanPathsample('./pathdata')
+    for temp in temps:
+        scan.dump_rates_full_network(temp)
+        for thresh in nrgthreshs:
+            communities = scan.parse.parse_dumpgroups(scan.path/f'G{thresh:.1f}/minima_groups.{temp:.10f}.G{thresh:.1f}')
+            scan.parse.write_communities(communities,
+                                         scan.path/f'communities_G{thresh:.2f}_T{temp:.2f}.dat')
+
 if __name__=='__main__':
     #temps = np.arange(0.03, 0.16, 0.01)
     temps = np.arange(0.03, 1.01, 0.01)
     #numinBs = np.arange(1, 396, 1)
     #numinAs = np.tile(1, len(numinBs))
-    #parse = ParsedPathsample('/scratch/dk588/databases/LJ38.2010/10000.minima/pathdata')
     #parse.sort_A_and_B(parse.path/'min.A.master',parse.path/'min.B.master', parse.path/'min.data')
-    #os.system(f"{PATHSAMPLE} > test")
     #scan_product_states(numinAs, numinBs, temps)
     """
     for temp in temps:
