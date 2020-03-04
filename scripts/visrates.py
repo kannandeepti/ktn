@@ -6,24 +6,62 @@ import seaborn as sns
 import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.legend import Legend
+from matplotlib import font_manager
+import os
 import seaborn as sns
 sns.set()
 import numpy as np
 import scipy
 
+textwidth_inches = 6.47699
+aspect_ratio = 5/14
 params = {'axes.edgecolor': 'black', 'axes.facecolor':'white', 'axes.grid': False, 'axes.titlesize': 20.0,
           'axes.linewidth': 0.75, 'backend': 'pdf','axes.labelsize':
           18,'legend.fontsize': 18,
           'xtick.labelsize': 18,'ytick.labelsize': 18,'text.usetex':
           False,'figure.figsize': [7, 5],
-          'mathtext.fontset': 'stixsans', 'savefig.format': 'pdf',
+          #'font.family': 'serif', 'font.serif': 'Computer Modern Roman',
+          'mathtext.fontset': 'cm', 'savefig.format': 'pdf',
           'xtick.bottom':True, 'xtick.major.pad': 5, 'xtick.major.size': 5,
           'xtick.major.width': 0.5,
           'ytick.left':True, 'ytick.right':False, 'ytick.major.pad': 5,
           'ytick.major.size': 5, 'ytick.major.width': 0.5,
           'ytick.minor.right':False, 'lines.linewidth':2}
 
-plt.rcParams.update(params)
+waitpdf_params = {'axes.edgecolor': 'black', 
+                  'axes.facecolor':'white', 
+                  'axes.grid': False, 
+                  'axes.linewidth': 0.5, 
+                  'backend': 'ps',
+                  'savefig.format': 'ps',
+                  'axes.titlesize': 11,
+                  'axes.labelsize': 11,
+                  'legend.fontsize': 9,
+                  'xtick.labelsize': 9,
+                  'ytick.labelsize': 9,
+                  'text.usetex': True,
+                  'figure.figsize': [7, 5],
+                  'font.family': 'serif', 
+                  'font.serif': ['Computer Modern Roman'],
+                  #'mathtext.fontset': 'cm', 
+                  'xtick.bottom':True,
+                  'xtick.top': True,
+                  'xtick.direction': 'in',
+                  'xtick.major.pad': 2, 
+                  'xtick.major.size': 3,
+                  'xtick.major.width': 0.25,
+
+                  'ytick.left':True, 
+                  'ytick.right':True, 
+                  'ytick.direction':'in',
+                  'ytick.major.pad': 2,
+                  'ytick.major.size': 3, 
+                  'ytick.major.width': 0.25,
+                  'ytick.minor.right':False, 
+                  'lines.linewidth':1}
+plt.rcParams.update(waitpdf_params)
+#fm = font_manager.json_load(os.path.expanduser("~/.cache/matplotlib/fontList.json"))
+#fm.findfont('serif', rebuild_if_missing=True)
 
 def plot_kAB_Gthresh(temp, direction='AB'):
     """plot kSSAB, kNGTAB as a function of Gthresh, and the exact kNGT
@@ -128,33 +166,32 @@ def plot_kNSS_temp(direction='BA'):
     plt.savefig(f'plots/kNSS{direction}_temp_diffAB.png')
     return np.array(kNSS1), np.array(kNSS2)
 
-def plot_NGT_arrhenius(thresh):
+def plot_NGT_arrhenius_modelA(thresh):
     """Compare rates from LEA vs. HS vs. NGT at a regrouping threshold."""
     df = pd.read_csv('csvs/rates_Gthresh_temp_scan_LEA_HS_NGT_Negs.csv')
     df = df.set_index('Gthresh')
     #first plot A<-B direction
     fig, ax = plt.subplots()
-    colors = sns.color_palette("Set2", 4)
+    colors = sns.color_palette("Set2", 3)
     df2 = df.xs(thresh)
+    df2.sort_values('T', inplace=True)
     #first plot LEA at all temperatures (since it works at all)
     temps = 1./df2[df2['T']>=0.70]['T']
     ax.plot(temps, np.log(df2[df2['T']>=0.70][f'kAB_LEA']), '-s', label='LEA',
                             color=colors[0], linewidth=1) 
     #then only plot NGT for temperatures that are not NaN
-    df2NGT = df2[-df2['kAB_NGT_Neg13'].isna()]
-    print(f"NGT non-NA temps: {df2NGT['T']}")
-    ax.plot(1./df2NGT['T'], np.log(df2NGT[f'kAB_NGT_Neg13']), '-o', label='MFPT',
-                            color=colors[1], linewidth=1) 
-    #then only plot HS for temperatures that are not NaN
-    df2HS = df2[-df2['kAB_HS_Neg13'].isna()]
-    print(f"HS non-NA temps: {df2HS['T']}")
-    ax.plot(1./df2HS['T'], np.log(df2HS[f'kAB_HS_Neg13']), '-o', label='H-S',
-                            color=colors[2], linewidth=1)
+    #df2NGT = df2[-df2['kAB_NGT_Neg13'].isna()]
+    #print(f"NGT non-NA temps: {df2NGT['T']}")
+    #ax.plot(1./df2NGT['T'], np.log(df2NGT[f'kAB_NGT_Neg13']), '-o', label='MFPT',
+    #                        color=colors[1], linewidth=1) 
     #then only plot HSK for temperatures that are not NaN
     df2HS = df2[-df2['kAB_HSK_Neg13'].isna()]
     ax.plot(1./df2HS['T'], np.log(df2HS[f'kAB_HSK_Neg13']), '-o', label='H-S-K',
-                            color=colors[3], linewidth=1)
-    print(f"HSK non-NA temps: {df2HS['T']}")
+                            color=colors[2], linewidth=1)
+    #then only plot HS for temperatures that are not NaN
+    df2HS = df2[-df2['kAB_HS_Neg13'].isna()]
+    ax.plot(1./df2HS['T'], np.log(df2HS[f'kAB_HS_Neg13']), '-o', label='H-S',
+                            color=colors[1], linewidth=1)
     #plot exact NGT answer
     ax.plot(temps, np.log(df2[df2['T']>=0.70][f'kNGTexactAB']), '-^', color='k', linewidth=1, 
                                 label=r'$k^F_{A\leftarrow B}$') 
@@ -171,17 +208,17 @@ def plot_NGT_arrhenius(thresh):
     ax.plot(temps, np.log(df2[df2['T']>=0.70][f'kBA_LEA']), '-s', label='LEA',
                             color=colors[0], linewidth=1) 
     #then only plot NGT for temperatures that are not NaN
-    df2NGT = df2[-df2['kBA_NGT_Neg13'].isna()]
-    ax.plot(1./df2NGT['T'], np.log(df2NGT[f'kBA_NGT_Neg13']), '-o', label='MFPT',
-                            color=colors[1], linewidth=1) 
-    #then only plot HS for temperatures that are not NaN
-    df2HS = df2[-df2['kBA_HS_Neg13'].isna()]
-    ax.plot(1./df2HS['T'], np.log(df2HS[f'kBA_HS_Neg13']), '-o', label='H-S',
-                            color=colors[2], linewidth=1)
+    #df2NGT = df2[-df2['kBA_NGT_Neg13'].isna()]
+    #ax.plot(1./df2NGT['T'], np.log(df2NGT[f'kBA_NGT_Neg13']), '-o', label='MFPT',
+    #                        color=colors[1], linewidth=1) 
     #then only plot HSK for temperatures that are not NaN
     df2HS = df2[-df2['kBA_HSK_Neg13'].isna()]
     ax.plot(1./df2HS['T'], np.log(df2HS[f'kBA_HSK_Neg13']), '-o', label='H-S-K',
-                            color=colors[3], linewidth=1)
+                            color=colors[2], linewidth=1)
+    #then only plot HS for temperatures that are not NaN
+    df2HS = df2[-df2['kBA_HS_Neg13'].isna()]
+    ax.plot(1./df2HS['T'], np.log(df2HS[f'kBA_HS_Neg13']), '-o', label='H-S',
+                            color=colors[1], linewidth=1)
     #plot exact NGT answer
     ax.plot(temps, np.log(df2[df2['T']>=0.70][f'kNGTexactBA']), '-^', color='k', linewidth=1, 
                                 label=r'$k^F_{B\leftarrow A}$') 
@@ -192,6 +229,202 @@ def plot_NGT_arrhenius(thresh):
     plt.legend()
     fig.tight_layout()
     plt.savefig(f'plots/modelA_kLEA_kHS_kNGT_Neg13_arrhenius_Gthresh{thresh}_BA.pdf')
+
+def plot_ratios_modelA_waitpdf(thresh):
+    """Compare rates from LEA vs. HS vs. NGT at a regrouping threshold."""
+    df = pd.read_csv('csvs/rates_LEA_HS_HSK_modelA_MFPT_waitpdf2.csv')
+    df = df.set_index('Gthresh')
+    colors = sns.color_palette("Dark2", 3)
+    df2 = df.xs(thresh)
+    df2= df2.sort_values('T')
+    df2 =df2[df2['T']>=1.0] 
+    rates = ['LEA', 'HSK', 'HS']
+    symbols = ['-s', '-o', '--^']
+    numerators = ['MFPT','tau*']
+    #denom = 'kNGTexact'
+    denom = 'MFPTexact'
+    #first plot A<-B direction
+    fig, (ax, ax2) = plt.subplots(1, 2,
+                                  figsize=[textwidth_inches,aspect_ratio*textwidth_inches])
+    for j, CG in enumerate(rates):
+        #then only plot HSK for temperatures that are not NaN
+        df2CG = df2[-df2[f'MFPTBA_{CG}'].isna()]
+        ax.plot(1./df2CG['T'], df2CG[f'MFPTBA_{CG}']/df2CG[f'{denom}BA'],
+                symbols[j], label=CG, color=colors[j], linewidth=1,
+                markersize=4)
+    ax.set_xlabel(r'$1/T$')
+    ax.legend(frameon=True)
+    for j, CG in enumerate(rates):
+        #then only plot HSK for temperatures that are not NaN
+        df2CG = df2[-df2[f'tau*BA_{CG}'].isna()]
+        ax2.plot(1./df2CG['T'], df2CG[f'tau*BA_{CG}']/df2CG[f'{denom}BA'],
+                symbols[j], label=CG, color=colors[j], linewidth=1,
+                markersize=4)
+    ax2.set_xlabel(r'$1/T$')
+    ax2.legend(frameon=True)
+    fig.subplots_adjust(left=0.12, top=0.97, right=0.99, bottom=0.11,
+                        wspace=0.325)
+    plt.savefig(f'plots/modelA_compare_LEA_HS_HSK_ratio_Gthresh{thresh}_BA.eps',
+                format='eps', dpi=1000,
+                bbox_inches='tight')
+
+def plot_ratios_modelA(thresh):
+    """Compare rates from LEA vs. HS vs. NGT at a regrouping threshold."""
+    df = pd.read_csv('csvs/rates_LEA_HS_HSK_modelA_MFPT_waitpdf2.csv')
+    df = df.set_index('Gthresh')
+    colors = sns.color_palette("Dark2", 3)
+    df2 = df.xs(thresh)
+    df2= df2.sort_values('T')
+    df2 =df2[df2['T']>=1.0] 
+    rates = ['LEA', 'HSK', 'HS']
+    symbols = ['-s', '-o', '--^']
+    numerators = ['MFPT','tau*']
+    #denom = 'kNGTexact'
+    denom = 'MFPTexact'
+    for i, k in enumerate(numerators): 
+        #first plot A<-B direction
+        fig, ax = plt.subplots()
+        for j, CG in enumerate(rates):
+            #then only plot HSK for temperatures that are not NaN
+            df2CG = df2[-df2[f'{k}AB_{CG}'].isna()]
+            ax.plot(1./df2CG['T'], df2CG[f'{k}AB_{CG}']/df2CG[f'{denom}AB'],
+                    symbols[j], label=CG, color=colors[j], linewidth=1)
+        plt.xlabel(r'$1/T$')
+        #plt.yscale('log')
+        """
+        if k=='k':
+            plt.ylabel(r'$k^{F\hspace{1em} CG}_{A\leftarrow B}/k^F_{A\leftarrow B}$')
+        if k=='k*':
+            plt.ylabel(r'$k^{*\hspace{1em} CG}_{A\leftarrow B}/k^F_{A\leftarrow B}$')
+        if k=='MFPT':
+            plt.ylabel(r'$\tau^{F\hspace{1em} CG}_{A\leftarrow B}/\tau^F_{A\leftarrow B}$')
+        if k=='tau*':
+            plt.ylabel(r'$\tau^{*\hspace{1em} CG}_{A\leftarrow B}/\tau^F_{A\leftarrow B}$')
+        """
+        #plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+        plt.legend()
+        fig.tight_layout()
+        plt.savefig(f'plots/modelA_{k}_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_AB.pdf')
+
+        #next plot B<-A direction
+        fig, ax = plt.subplots()
+        for j, CG in enumerate(rates):
+            #then only plot HSK for temperatures that are not NaN
+            df2CG = df2[-df2[f'{k}BA_{CG}'].isna()]
+            ax.plot(1./df2CG['T'], df2CG[f'{k}BA_{CG}']/df2CG[f'{denom}BA'],
+                    symbols[j], label=CG, color=colors[j], linewidth=1)
+        plt.xlabel(r'$1/T$')
+        #plt.yscale('log')
+        """
+        if k=='k':
+            plt.ylabel(r'$k^{F\hspace{1em} CG}_{B\leftarrow A}/k^F_{B\leftarrow A}$')
+        if k=='k*':
+            plt.ylabel(r'$k^{*\hspace{1em} CG}_{B\leftarrow A}/k^F_{B\leftarrow A}$')
+        if k=='MFPT':
+            plt.ylabel(r'$\tau^{F\hspace{1em} CG}_{B\leftarrow A}/\tau^F_{B\leftarrow A}$')
+        if k=='tau*':
+            plt.ylabel(r'$\tau^{*\hspace{1em} CG}_{B\leftarrow A}/\tau^F_{B\leftarrow A}$')
+        """
+        #plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+        plt.legend()
+        fig.tight_layout()
+        plt.savefig(f'plots/modelA_{k}_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_BA.pdf')
+
+    #next plot k*RG/k^FRG
+    #first plot A<-B direction
+    fig, ax = plt.subplots()
+    for j, CG in enumerate(rates):
+        #then only plot HSK for temperatures that are not NaN
+        df2CG = df2[-df2[f'tau*AB_{CG}'].isna()]
+        ax.plot(1./df2CG['T'], df2CG[f'tau*AB_{CG}']/df2CG[f'MFPTAB_{CG}'],
+                symbols[j], label=CG, color=colors[j], linewidth=1)
+    plt.xlabel(r'$1/T$')
+    #plt.yscale('log')
+    #plt.ylabel(r'$\tau^{*\hspace{0.5em} CG}_{A\leftarrow B}/\tau^{F\hspace{0.5em} CG}_{A\leftarrow B}$')
+    #plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+    plt.legend()
+    fig.tight_layout()
+    plt.savefig(f'plots/modelA_mfpt*F_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_AB.pdf')
+
+    #next plot B<-A direction
+    fig, ax = plt.subplots()
+    for j, CG in enumerate(rates):
+        #then only plot HSK for temperatures that are not NaN
+        df2CG = df2[-df2[f'tau*BA_{CG}'].isna()]
+        ax.plot(1./df2CG['T'], df2CG[f'tau*BA_{CG}']/df2CG[f'MFPTBA_{CG}'],
+                symbols[j], label=CG, color=colors[j], linewidth=1)
+    plt.xlabel(r'$1/T$')
+    #plt.yscale('log')
+    #plt.ylabel(r'$\tau^{*\hspace{0.5em} CG}_{B\leftarrow A}/\tau^{F\hspace{0.5em} CG}_{B\leftarrow A}$')
+    #plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+    plt.legend()
+    fig.tight_layout()
+    plt.savefig(f'plots/modelA_k*kF_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_BA.pdf')
+
+def plot_NGT_arrhenius_LJ38(thresh):
+    """Compare rates from LEA vs. HS vs. NGT at a regrouping threshold."""
+    df = pd.read_csv('csvs/rates_HS_LEA_NGT_LJ38.csv')
+    df = df.set_index('Gthresh')
+    #first plot A<-B direction
+    fig, ax = plt.subplots()
+    colors = sns.color_palette("Set2", 4)
+    df2 = df.xs(thresh)
+    #first plot LEA at all temperatures (since it works at all)
+    temps = 1./df2['T']
+    ax.plot(temps, np.log(df2[f'kAB_LEA']), '-s', label='LEA',
+                            color=colors[0], linewidth=1) 
+    #then only plot NGT for temperatures that are not NaN
+    df2NGT = df2[-df2['kAB_NGT'].isna()]
+    print(f"NGT non-NA temps: {df2NGT['T']}")
+    ax.plot(1./df2NGT['T'], np.log(df2NGT[f'kAB_NGT']), '-o', label='MFPT',
+                            color=colors[1], linewidth=1) 
+    #then only plot HS for temperatures that are not NaN
+    df2HS = df2[-df2['kAB_HS'].isna()]
+    print(f"HS non-NA temps: {df2HS['T']}")
+    ax.plot(1./df2HS['T'], np.log(df2HS[f'kAB_HS']), '-o', label='H-S',
+                            color=colors[2], linewidth=1)
+    #then only plot HSK for temperatures that are not NaN
+    #df2HS = df2[-df2['kAB_HSK'].isna()]
+    #ax.plot(1./df2HS['T'], np.log(df2HS[f'kAB_HSK']), '-o', label='H-S-K',
+    #                        color=colors[3], linewidth=1)
+    #print(f"HSK non-NA temps: {df2HS['T']}")
+    #plot exact NGT answer
+    ax.plot(temps, np.log(df2[f'kNGTexactAB']), '-^', color='k', linewidth=1, 
+                                label=r'$k^F_{A\leftarrow B}$') 
+    plt.xlabel('1/T')
+    #plt.xlim([temps.min(), (1./df2HS['T']).max()])
+    plt.ylabel(r'ln($k^{F\hspace{1} CG}_{A\leftarrow B}$)')
+    plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+    plt.legend()
+    fig.tight_layout()
+    plt.savefig(f'plots/LJ38_kLEA_kHS_kNGT_arrhenius_Gthresh{thresh}_AB.pdf')
+
+    #next plot B<-A direction
+    fig, ax = plt.subplots()
+    ax.plot(temps, np.log(df2[f'kBA_LEA']), '-s', label='LEA',
+                            color=colors[0], linewidth=1) 
+    #then only plot NGT for temperatures that are not NaN
+    df2NGT = df2[-df2['kBA_NGT'].isna()]
+    ax.plot(1./df2NGT['T'], np.log(df2NGT[f'kBA_NGT']), '-o', label='MFPT',
+                            color=colors[1], linewidth=1) 
+    #then only plot HS for temperatures that are not NaN
+    df2HS = df2[-df2['kBA_HS'].isna()]
+    ax.plot(1./df2HS['T'], np.log(df2HS[f'kBA_HS']), '-o', label='H-S',
+                            color=colors[2], linewidth=1)
+    #then only plot HSK for temperatures that are not NaN
+    #df2HS = df2[-df2['kBA_HSK_Neg13'].isna()]
+    #ax.plot(1./df2HS['T'], np.log(df2HS[f'kBA_HSK_Neg13']), '-o', label='H-S-K',
+    #                        color=colors[3], linewidth=1)
+    #plot exact NGT answer
+    ax.plot(temps, np.log(df2[f'kNGTexactBA']), '-^', color='k', linewidth=1, 
+                                label=r'$k^F_{B\leftarrow A}$') 
+    plt.xlabel('1/T')
+    #plt.xlim([temps.min(), (1./df2HS['T']).max()])
+    plt.ylabel(r'ln($k^{F\hspace{1} CG}_{B\leftarrow A}$)')
+    plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+    plt.legend()
+    fig.tight_layout()
+    plt.savefig(f'plots/LJ38_kLEA_kHS_kNGT_arrhenius_Gthresh{thresh}_BA.pdf')
 
 def plot_NGT_arrhenius_Gthresh(direction='AB'):
     df = pd.read_csv('csvs/rates_Gthresh_temp_scan_LEA_HS_NGT.csv')

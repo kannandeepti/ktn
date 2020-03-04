@@ -16,6 +16,7 @@ import os
 import glob
 import pandas as pd
 from pathlib import Path
+import subprocess
 
 MAXINA = 5
 MAXINB = 395
@@ -145,11 +146,57 @@ class ParsedPathsample(object):
                     if words[0] == 'NGT>' and words[1]=='k(A<-B)=':
                         self.output['kAB'] = float(words[2])
                         self.output['kBA'] = float(words[4])
-                    if words[0] == 'NGT>' and words[1]=='MFPT(A<-B)=':
-                        self.output['MFPTAB'] = float(words[2])
-                        self.output['MFPTBA'] = float(words[4])
+                        self.output['MFPTAB'] = float(words[6])
+                        self.output['MFPTBA'] = float(words[8])
+                    if words[0] == 'waitpdf>' and words[2]=='A<-B':
+                        self.output['tau*AB'] = float(words[7])
+                    if words[0] == 'waitpdf>' and words[2]=='B<-A':
+                        self.output['tau*BA'] = float(words[7])
                         #this is the last line we're interested in
                         break
+
+    def parse_GT_intermediates(self, outfile):
+        """Returns a DataFrame of GT quantities, including branching
+        probabilities and curly T_Ab, after disconnection of sources."""
+
+        regex1 = re.compile('NGT> for (A|B) minimum\s+([0-9]+) ' +
+                            '(?:P_{Ba}|P_{Ab})=\s+([0-9.E-]+) and time ' +
+                            'tau\^F_(?:a|b)=\s+([0-9.E-]+)')
+
+        regex2 = re.compile('NGT> for (A|B) minimum\s+([0-9]+) ' +
+                            '(?:tau\^F_a/P_{Ba} = T_{Ba}, p_a/P_A, '+
+                            'weight/T_{Ba}|tau\^F_b/P_{Ab} = T_{Ab}, p_b/P_B, ' +
+                            'weight/T_{Ab})=\s+([0-9.E-]+)\s+([0-9.E-]+)\s+([0-9.E-]+)')
+        
+        dfs = []
+        finished = False
+        with open(outfile) as f:
+            olddf = pd.DataFrame(columns=['JsetLabel','min','PIj','tauF_j'])
+            olddf2 = pd.DataFrame(columns=['T_Ij','pihat_j'])
+            for line in f:
+                if not line:
+                    continue
+                match = regex1.match(line)
+                if match is not None:
+                    label, min, PIj, tau_j = match.groups()
+                    df = pd.DataFrame()
+                    df['JsetLabel'] = [label]
+                    df['min'] = [min]
+                    df['PIj'] = [PIj]
+                    df['tauF_j'] = [tau_j]
+                    olddf = pd.concat([olddf, df], axis=0, ignore_index=True)
+                    continue
+                match2 = regex2.match(line)
+                if match2 is not None:
+                    label, min, T_Ij, pihat_j, pihat_over_TIj = match2.groups()
+                    df2 = pd.DataFrame()
+                    df2['T_Ij'] = [T_Ij]
+                    df2['pihat_j'] = [pihat_j]
+                    olddf2 = pd.concat([olddf2, df2], axis=0,
+                                       ignore_index=True)
+            bigdf = pd.concat([olddf, olddf2], axis=1, ignore_index=True)
+            bigdf.to_csv('csvs/GT_quantities.csv')
+
 
     def parse_dumpgroups(self, mingroupsfile, grouptomin=False):
         """Parse the `minima_groups.{temp}` file outputted by the DUMPGROUPS
@@ -296,10 +343,11 @@ class ParsedPathsample(object):
                     self.append_input('TEMPERATURE', f'{temp}')
                     self.write_input(self.path/'pathdata')
                     #run PATHSAMPLE
-                    outfile = self.path/f'out.{ci+1}.{cj+1}.T{temp}'
-                    os.system(f"{PATHSAMPLE} > {outfile}")
+                    outfile = open(self.path/f'out.{ci+1}.{cj+1}.T{temp}','w')
+                    subprocess.run(f"{PATHSAMPLE}", stdout=outfile,
+                                   cwd=self.patpath)
                     #parse output
-                    self.parse_output(outfile=outfile)
+                    self.parse_output(outfile=self.path/f'out.{ci+1}.{cj+1}.T{temp}')
                     MFPT[ci, cj] = 1./self.output['kAB']
                     MFPT[cj, ci] = 1./self.output['kBA']
 
@@ -391,10 +439,10 @@ class ParsedPathsample(object):
         os.system(f"cp {self.path}/min.B.{C2} {self.path}/min.B")
         os.system(f"cp {self.path}/min.data.{C1}.{C2} {self.path}/min.data")
         os.system(f"cp {self.path}/ts.data.{C1}.{C2} {self.path}/ts.data")
-        outfile = self.path/f'out.{C1}.{C2}.T{temp}'
-        os.system(f"{PATHSAMPLE} > {outfile}")
+        outfile = open(self.path/f'out.{C1}.{C2}.T{temp}','w')
+        subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
         #parse output
-        self.parse_output(outfile=outfile)
+        self.parse_output(outfile=self.path/f'out.{C1}.{C2}.T{temp}')
         for f in files_to_modify:
             os.system(f'mv {f}.old {f}')
         #return rates k(C1<-C2), k(C2<-C1)
@@ -500,8 +548,8 @@ class ScanPathsample(object):
         else:
             self.parse.append_input('TEMPERATURE', f'{temp}')
         self.parse.write_input(self.pathdatafile)
-        outfile = self.path/f'out.dumpinfo.{temp:.2f}'
-        os.system(f"{PATHSAMPLE} > {outfile}")
+        outfile = open(self.path/f'out.dumpinfo.{temp:.2f}','w')
+        subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
         #also write a ts_weights.dat file using info from ts.data
         tsdata = np.loadtxt(self.path/'ts.data')
         tsdata = tsdata[:,[3,4]].astype('int') #isolating minima ts connects
@@ -536,8 +584,8 @@ class ScanPathsample(object):
         self.parse.comment_input('NGT') 
         self.parse.append_input('DUMPINFOMAP', '') #to obtain Daniel's files
         self.parse.write_input(self.pathdatafile)
-        outfile = self.path/f'out.dumpinfo.LEA.{temp:.2f}'
-        os.system(f"{PATHSAMPLE} > {outfile}")
+        outfile = open(self.path/f'out.dumpinfo.LEA.{temp:.2f}','w')
+        subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
         #rename the files something useful
         for f in files_to_write:
             os.system(f'mv {f} {self.path}/{f.stem}_LEA_T{temp:.2f}.dat')
@@ -564,12 +612,14 @@ class ScanPathsample(object):
         self.parse.comment_input('DUMPGROUPS')
         self.parse.append_input('NGT', '0 T')
         self.parse.write_input(scan.pathdatafile)
-        outfile_noregroup = self.path/f'out.NGT.kNGT.{Gthresh:.2f}'
-        os.system(f"{PATHSAMPLE} > {outfile_noregroup}")
-        self.parse.parse_output(outfile=outfile_noregroup)
+        outfile = open(self.path/f'out.NGT.kNGT.{Gthresh:.2f}','w')
+        subprocess.run(f"{PATHSAMPLE}n, stdout=outfile, cwd=self.pathoregroup}")
+        self.parse.parse_output(outfile=self.path/f'out.NGT.kNGT.{Gthresh:.2f}')
         rates = {}
         rates['kAB'] = self.parse.output['kAB']
         rates['kBA'] = self.parse.output['kBA']
+        rates['MFPTAB'] = self.parse.output['MFPTAB']
+        rates['MFPTBA'] = self.parse.output['MFPTBA']
         rates['kNSSAB'] = self.parse.output['kNSSAB']
         rates['kNSSBA'] = self.parse.output['kNSSBA']
         rates['kSSAB'] = self.parse.output['kSSAB']
@@ -586,17 +636,89 @@ class ScanPathsample(object):
         self.parse.comment_input('DUMPGROUPS')
         self.parse.append_input('NGT', '0 T')
         self.parse.write_input(self.pathdatafile)
-        outfile_noregroup = self.path/'out.NGT.NOREGROUP'
-        os.system(f"{PATHSAMPLE} > {outfile_noregroup}")
-        self.parse.parse_output(outfile=outfile_noregroup)
+        outfile = open(self.path/'out.NGT.NOREGROUP','w')
+        subprocess.run(f"{PATHSAMPLE}n, stdout=outfile, cwd=self.pathoregroup}")
+        self.parse.parse_output(outfile=self.path/'out.NGT.NOREGROUP')
         rates = {}
         rates['kAB'] = self.parse.output['kAB']
         rates['kBA'] = self.parse.output['kBA']
+        rates['MFPTAB'] = self.parse.output['MFPTAB']
+        rates['MFPTBA'] = self.parse.output['MFPTBA']
         rates['kNSSAB'] = self.parse.output['kNSSAB']
         rates['kNSSBA'] = self.parse.output['kNSSBA']
         rates['kSSAB'] = self.parse.output['kSSAB']
         rates['kSSBA'] = self.parse.output['kSSBA']
         return rates
+
+    def run_regroup(self, temp, value, NGTpostregroup=False):
+        """Run REGROUPFREE once at a threshold given by value
+        and a temperature given by temp."""
+
+        df = pd.DataFrame()
+        #update input
+        self.parse.append_input('TEMPERATURE', temp)
+        self.parse.append_input('REGROUPFREE', value)
+        self.parse.append_input('DUMPGROUPS', '')
+        self.parse.append_input('PLANCK', 1)
+        if NGTpostregroup:
+            self.parse.comment_input('NGT')
+        else:
+            self.parse.append_input('NGT', '0 T')
+        #overwrite pathdata file with updated input
+        self.parse.write_input(self.pathdatafile)
+        #run calculation 
+        outfile = open(self.path/f'{self.outbase}.REGROUPFREE.{value:.2f}','w')
+        subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
+        #parse output
+        self.parse.parse_output(outfile=self.path/f'{self.outbase}.REGROUPFREE.{value:.2f}')
+        if NGTpostregroup:
+            rates = self.run_NGT_regrouped(value, temp)
+            df['kNSSAB'] = rates['kNSSAB']
+            df['kNSSBA'] = rates['kNSSBA']
+            df['kSSAB'] = rates['kSSAB']
+            df['kSSBA'] = rates['kSSBA']
+            df['kAB'] = rates['kAB']
+            df['kBA'] = rates['kBA']
+        else:
+            df['kAB_LEA'] = [self.parse.output['kAB']]
+            df['kBA_LEA'] = [self.parse.output['kBA']]
+        df['Gthresh'] = [value]
+        df['T'] = [temp]
+        #extract group assignments for this temperature/Gthresh
+        communities = self.parse.parse_dumpgroups(self.path/f'minima_groups.{temp:.10f}',
+                                    grouptomin=True)
+        #create new parse object, parse min.A.regrouped, min.B.regrouped
+        ABparse = ParsedPathsample(self.pathdatafile)
+        ABparse.parse_minA_and_minB(self.path/f'min.A.regrouped.{temp:.10f}',
+                                    self.path/f'min.B.regrouped.{temp:.10f}')
+        #calculate the total number of minima in A and B
+        regroupedA = []
+        for a in ABparse.minA: #0-indexed so add 1
+            #count the number of minima in that group, increment total count
+            regroupedA += communities[a+1]
+        sizeOfA = len(regroupedA)
+        regroupedB = []
+        for b in ABparse.minB: #0-indexed so add 1
+            #count the number of minima in that group, increment total count
+            regroupedB += communities[b+1]
+        sizeOfB = len(regroupedB)
+        df['ncomms'] = len(communities)
+        df['regroupedA'] = sizeOfA
+        df['regroupedB'] = sizeOfB
+        # rename files to also include Gthresh in filename
+        files_to_rename = [self.path/f'minima_groups.{temp:.10f}',
+                            self.path/f'ts_groups.{temp:.10f}',
+                            self.path/f'min.A.regrouped.{temp:.10f}',
+                            self.path/f'min.B.regrouped.{temp:.10f}',
+                            self.path/f'min.data.regrouped.{temp:.10f}',
+                            self.path/f'ts.data.regrouped.{temp:.10f}']
+        for f in files_to_rename:
+            dir_name = Path(self.path/f'G{value:.1f}')
+            if not dir_name.is_dir():
+                dir_name.mkdir()
+            os.system(f'mv {f} {dir_name}/{f.name}.G{value:.1f}')
+        print(f"Computed rate constants for regrouped minima with threshold {value}") 
+        return df
     
     def scan_regroup(self, name, values, temp, NGTpostregroup=False):
         """Re-run PATHSAMPLE calculations for different `values` of the
@@ -606,71 +728,9 @@ class ScanPathsample(object):
         csv = Path(f'csvs/rates_{self.suffix}.csv')
         dfs = []
         for value in values:
-            df = pd.DataFrame()
-            #update input
-            self.parse.append_input(name, value)
-            self.parse.append_input('DUMPGROUPS', '')
-            if NGTpostregroup:
-                self.parse.comment_input('NGT')
-            #overwrite pathdata file with updated input
-            self.parse.write_input(self.pathdatafile)
-            #run calculation 
-            outfile = self.path/f'{self.outbase}.{name}.{value:.2f}'
-            os.system(f"{PATHSAMPLE} > {outfile}")
-            #parse output
-            self.parse.parse_output(outfile=outfile)
-            #store the output under the value it was run at
-            if NGTpostregroup:
-                rates = self.run_NGT_regrouped(value, temp)
-                df['kNSSAB'] = rates['kNSSAB']
-                df['kNSSBA'] = rates['kNSSBA']
-                df['kSSAB'] = rates['kSSAB']
-                df['kSSBA'] = rates['kSSBA']
-                df['kAB'] = rates['kAB']
-                df['kBA'] = rates['kBA']
-            else:
-                df['kAB_LEA'] = [self.parse.output['kAB']]
-                df['kBA_LEA'] = [self.parse.output['kBA']]
-            df['Gthresh'] = [value]
-            #extract group assignments for this temperature/Gthresh
-            communities = self.parse.parse_dumpgroups(self.path/f'minima_groups.{temp:.10f}',
-                                       grouptomin=True)
-            #create new parse object, parse min.A.regrouped, min.B.regrouped
-            ABparse = ParsedPathsample(self.pathdatafile)
-            ABparse.parse_minA_and_minB(self.path/f'min.A.regrouped.{temp:.10f}',
-                                        self.path/f'min.B.regrouped.{temp:.10f}')
-            #calculate the total number of minima in A and B
-            regroupedA = []
-            for a in ABparse.minA: #0-indexed so add 1
-                #count the number of minima in that group, increment total count
-                regroupedA += communities[a+1]
-            sizeOfA = len(regroupedA)
-            regroupedB = []
-            for b in ABparse.minB: #0-indexed so add 1
-                #count the number of minima in that group, increment total count
-                regroupedB += communities[b+1]
-            sizeOfB = len(regroupedB)
-            df['ncomms'] = len(communities)
-            df['regroupedA'] = sizeOfA
-            df['regroupedB'] = sizeOfB
+            df = self.run_regroup(temp, value, NGTpostregroup)
             dfs.append(df)
-            # rename files to also include Gthresh in filename
-            files_to_rename = [self.path/f'minima_groups.{temp:.10f}',
-                               self.path/f'ts_groups.{temp:.10f}',
-                               self.path/f'min.A.regrouped.{temp:.10f}',
-                               self.path/f'min.B.regrouped.{temp:.10f}',
-                               self.path/f'min.data.regrouped.{temp:.10f}',
-                               self.path/f'ts.data.regrouped.{temp:.10f}']
-            for f in files_to_rename:
-                dir_name = Path(self.path/f'G{value:.1f}')
-                if not dir_name.is_dir():
-                    dir_name.mkdir()
-                os.system(f'mv {f} {dir_name}/{f.name}.G{value:.1f}')
-            print(f"Computed rate constants for regrouped minima with threshold {value}") 
         bigdf = pd.concat(dfs, ignore_index=True, sort=False)
-        bigdf['T'] = temp
-        bigdf['numInA'] = self.parse.numInA
-        bigdf['numInB'] = self.parse.numInB
         rates = self.run_NGT_exact()
         bigdf['kNGTexactAB'] = rates['kAB']
         bigdf['kNGTexactBA'] = rates['kBA']
@@ -694,10 +754,10 @@ class ScanPathsample(object):
             #overwrite pathdata file with updated input
             self.parse.write_input(self.pathdatafile)
             #run calculation 
-            outfile = self.path/f'{self.outbase}.{name}.{value:.2f}'
-            os.system(f"{PATHSAMPLE} > {outfile}")
+            outfile = open(self.path/f'{self.outbase}.{name}.{value:.2f}','w')
+            subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
             #parse output
-            self.parse.parse_output(outfile=outfile)
+            self.parse.parse_output(outfile=self.path/f'{self.outbase}.{name}.{value:.2f}')
             #store the output under the value it was run at
             self.outputs[value] = self.parse.output
             df['kNSSAB'] = [self.parse.output['kNSSAB']]
@@ -753,16 +813,29 @@ def scan_Gthresh_and_temp(temps, nrgthreshs):
     """ Calculate rates at different free energy thresholds for regrouping and
     at different temperatures. """
 
-    suffix = 'Gthresh_temp_scan'
-    #olddf = pd.read_csv(f'rates_{suffix}.csv')
-    #olddf = olddf.set_index(['T',')
+    suffix = 'Gthresh_temp_scan3'
+    csv = Path(f'csvs/rates_{suffix}.csv')
+    olddf = pd.read_csv(csv)
+    olddf = olddf.set_index(['T','Gthresh'])
     for temp in temps:
-        #if temp in olddf.index:
-        #    continue
+        dfs = []
+        for thresh in nrgthreshs:
+            if (temp, thresh) in olddf.index:
+                continue
+            scan = ScanPathsample('./pathdata', suffix=suffix)
+            df = scan.run_regroup(temp, thresh)
+            dfs.append(df)
+            scan.remove_output()
+        bigdf = pd.concat(dfs, ignore_index=True, sort=False)
         scan = ScanPathsample('./pathdata', suffix=suffix)
-        scan.parse.append_input('TEMPERATURE', temp)
-        scan.scan_regroup('REGROUPFREE', nrgthreshs, temp)
+        rates = scan.run_NGT_exact()
+        bigdf['kNGTexactAB'] = rates['kAB']
+        bigdf['kNGTexactBA'] = rates['kBA']
+        bigdf = bigdf.set_index(['T', 'Gthresh'])
+        olddf = pd.concat([olddf, bigdf], axis=0, ignore_index=False)
         scan.remove_output()
+    #write updated file to csv
+    olddf.to_csv('csvs/rates_Gthresh_temp_scan4.csv')
 
 def dump_ktn_info_scan(temps, nrgthreshs):
     """Dumpt all .dat files based on temp/Gthresh scan."""

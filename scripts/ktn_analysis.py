@@ -7,6 +7,7 @@ ScanPathsample classes.
 Deepti Kannan 2020 """
 
 from code_wrapper import ParsedPathsample
+from code_wrapper import ScanPathsample
 
 import numpy as np
 from numpy.linalg import inv
@@ -22,6 +23,7 @@ import seaborn as sns
 sns.set()
 import pandas as pd
 import os
+import subprocess
 
 PATHSAMPLE = "/home/dk588/svn/PATHSAMPLE/build/gfortran/PATHSAMPLE"
 params = {'axes.edgecolor': 'black', 'axes.facecolor':'white', 
@@ -44,13 +46,26 @@ class Analyze_KTN(object):
     def __init__(self, path, communities=None,
                  commdata=None, pathsample=None):
         self.path = Path(path) #path to directory with all relevant files
+        self.K = None
+        self.pi = None
+        self.commpi = None
         if communities is not None:
             self.communities = communities
         elif commdata is not None:
             self.communities = self.read_communities(self.path/commdata)
         else:
-            raise AttributeError('Either communities or commdata must' \
-                                 'be specified.')
+            if thresh is not None and temp is not None:
+                commdata=f'communities_G{thresh:.2f}_T{temp:.3f}.dat'
+                self.communities = self.read_communities(self.path/commdata)
+                logpi, Kmat = self.read_ktn_info(f'T{temp:.3f}', log=True)
+                pi = np.exp(logpi)
+                self.K = Kmat
+                self.pi = pi/pi.sum()
+                commpi = self.get_comm_stat_probs(logpi, log=False)
+                self.commpi = commpi/commpi.sum()
+            else:
+                raise AttributeError('Either communities or commdata must' \
+                                    'be specified.')
         #for analyzing rate matrices generated from PATHSAMPLE
         if pathsample is not None:
             self.parse = pathsample
@@ -131,10 +146,10 @@ class Analyze_KTN(object):
         os.system(f"cp {self.path}/min.B.{C2} {self.path}/min.B")
         os.system(f"cp {self.path}/min.data.{C1}.{C2} {self.path}/min.data")
         os.system(f"cp {self.path}/ts.data.{C1}.{C2} {self.path}/ts.data")
-        outfile = self.path/f'out.{C1}.{C2}.T{temp}'
-        os.system(f"{PATHSAMPLE} > {outfile}")
+        outfile = open(self.path/f'out.{C1}.{C2}.T{temp}','w')
+        subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
         #parse output
-        self.parse_output(outfile=outfile)
+        self.parse_output(outfile=self.path/f'out.{C1}.{C2}.T{temp}')
         for f in files_to_modify:
             os.system(f'mv {f}.old {f}')
         #return rates k(C1<-C2), k(C2<-C1)
@@ -167,19 +182,23 @@ class Analyze_KTN(object):
         """Calculate the coarse-grained rate matrix obtained using the local
         equilibrium approximation (LEA)."""
 
+        if self.K is None:
+            logpi, Kmat = self.read_ktn_info(f'T{temp:.3f}', log=True)
+            pi = np.exp(logpi)
+            self.K = Kmat
+            self.pi = pi/pi.sum()
+            commpi = self.get_comm_stat_probs(logpi, log=False)
+            self.commpi = commpi/commpi.sum()
         N = len(self.communities)
         Rlea = np.zeros((N,N))
-        logpi, Kmat = self.read_ktn_info(f'T{temp:.2f}', log=True)
-        pi = np.exp(logpi)
-        commpi = self.get_comm_stat_probs(logpi, log=False)
 
         for i in range(N):
             for j in range(N):
                 if i < j:
                     ci = np.array(self.communities[i+1]) - 1
                     cj = np.array(self.communities[j+1]) - 1
-                    Rlea[i, j] = np.sum(Kmat[np.ix_(ci, cj)]@pi[cj]) / commpi[j]
-                    Rlea[j, i] = np.sum(Kmat[np.ix_(cj, ci)]@pi[ci]) / commpi[i]
+                    Rlea[i, j] = np.sum(self.K[np.ix_(ci, cj)]@self.pi[cj]) / self.commpi[j]
+                    Rlea[j, i] = np.sum(self.K[np.ix_(cj, ci)]@self.pi[ci]) / self.commpi[i]
         
         for i in range(N):
             Rlea[i, i] = -np.sum(Rlea[:, i])
@@ -189,16 +208,17 @@ class Analyze_KTN(object):
         """ Calculate the coarse-grained rate matrix using the Hummer-Szabo
         relation, aka eqn. (12) in Hummer & Szabo (2015) J.Phys.Chem.B."""
 
+        if self.K is None:
+            logpi, Kmat = self.read_ktn_info(f'T{temp:.3f}', log=True)
+            pi = np.exp(logpi)
+            self.K = Kmat
+            self.pi = pi/pi.sum()
+            commpi = self.get_comm_stat_probs(logpi, log=False)
+            self.commpi = commpi/commpi.sum()
         N = len(self.communities)
-        logpi, Kmat = self.read_ktn_info(f'T{temp:.2f}', log=True)
-        pi = np.exp(logpi)
-        pi = pi/np.sum(pi)
-        V = len(pi)
-        commpi = self.get_comm_stat_probs(logpi, log=False)
-        commpi = commpi / np.sum(commpi)
-        D_N = np.diag(commpi)
-        D_V = np.diag(pi)
-
+        V = len(self.pi)
+        D_N = np.diag(self.commpi)
+        D_V = np.diag(self.pi)
         #construct clustering matrix M from community assignments
         M = np.zeros((V, N))
         for ci in self.communities:
@@ -207,34 +227,36 @@ class Analyze_KTN(object):
             col[comm_idxs] = 1.0
             M[:, ci-1] = col
 
-        Pi_col = commpi.reshape((N, 1))
-        pi_col = pi.reshape((V, 1))
-        mat_to_invert = pi_col@np.ones((1,V)) - Kmat
+        Pi_col = self.commpi.reshape((N, 1))
+        pi_col = self.pi.reshape((V, 1))
+        mat_to_invert = pi_col@np.ones((1,V)) - self.K
         first_inverse = spla.inv(mat_to_invert)
         #check that Pi = M^T pi
         Pi_calc = M.T@pi
-        for entry in np.abs(commpi - Pi_calc):
+        for entry in np.abs(self.commpi - Pi_calc):
             assert(entry < 1.0E-10)
 
         #H-S relation
         second_inversion = spla.inv(M.T@first_inverse@D_V@M)
         R_HS = Pi_col@np.ones((1,N)) - D_N@second_inversion
-        self.check_detailed_balance(np.log(commpi), R_HS)
+        self.check_detailed_balance(np.log(self.commpi), R_HS)
         return R_HS
 
     def hummer_szabo_from_mfpt(self, temp):
         """Calculate Hummer-Szabo coarse-grained rate matrix using Eqn. (72)
         of Kells et al. (2019) paper on correlation functions and the Kemeny
         constant."""
+        if self.K is None:
+            logpi, Kmat = self.read_ktn_info(f'T{temp:.3f}', log=True)
+            pi = np.exp(logpi)
+            self.K = Kmat
+            self.pi = pi/pi.sum()
+            commpi = self.get_comm_stat_probs(logpi, log=False)
+            self.commpi = commpi/commpi.sum()
         N = len(self.communities)
-        logpi, Kmat = self.read_ktn_info(f'T{temp:.2f}', log=True)
-        pi = np.exp(logpi)
-        pi = pi/np.sum(pi)
-        n = len(pi)
-        commpi = self.get_comm_stat_probs(logpi, log=False)
-        commpi = commpi / np.sum(commpi)
-        D_N = np.diag(commpi)
-        D_n = np.diag(pi)
+        n = len(self.pi)
+        D_N = np.diag(self.commpi)
+        D_n = np.diag(self.pi)
 
         #construct clustering matrix M from community assignments
         M = np.zeros((n, N))
@@ -244,13 +266,13 @@ class Analyze_KTN(object):
             col[comm_idxs] = 1.0
             M[:, ci-1] = col
 
-        Pi_col = commpi.reshape((N, 1))
-        pi_col = pi.reshape((n, 1))
-        mfpt = self.get_MFPT_from_Kmat(Kmat)
+        Pi_col = self.commpi.reshape((N, 1))
+        pi_col = self.pi.reshape((n, 1))
+        mfpt = self.get_MFPT_from_Kmat(self.K)
         R = Pi_col@np.ones((1,N)) - spla.inv(Pi_col@np.ones((1,N)) +
                                  M.T@D_n@mfpt@pi_col@np.ones((1,N)) -
-                                 M.T@D_n@mfpt@D_n@M@np.diag(1./commpi))
-        self.check_detailed_balance(np.log(commpi), R)
+                                 M.T@D_n@mfpt@D_n@M@np.diag(1./self.commpi))
+        self.check_detailed_balance(np.log(self.commpi), R)
         return R
 
     def get_MFPT_from_Kmat(self, K):
@@ -264,8 +286,11 @@ class Analyze_KTN(object):
                 if i==0 and j==0:
                     mfpt[i][j] = 0.
                 else:
-                    mfpt[i][j] = -spla.solve(K[np.arange(n)!=i, :][:, np.arange(n)!=i],
-                                            (np.arange(n)==j)[np.arange(n)!=i]).sum()
+                    try:
+                        mfpt[i][j] = -spla.solve(K[np.arange(n)!=i, :][:, np.arange(n)!=i],
+                                                (np.arange(n)==j)[np.arange(n)!=i]).sum()
+                    except scipy.linalg.LinAlgWarning as err:
+                        raise Exception('LinAlgWarning') 
 
         return mfpt
 
@@ -310,9 +335,30 @@ class Analyze_KTN(object):
 
         return tJI
 
+    def check_mfpt_equivalence(self, pi, commpi, mfpt):
+
+        N = len(self.communities)
+        tJI = np.zeros((N,N))
+        for i in range(N):
+            for j in range(N):
+                ci = np.array(self.communities[i+1]) - 1
+                cj = np.array(self.communities[j+1]) - 1
+                numInJ = len(cj)
+                tJI[j][i] = np.ones((1,numInJ))@ mfpt[cj,:][:,ci] @ pi[ci] / commpi[i]
+                tJI[j][i] -= pi[cj] @ mfpt[cj,:][:,cj] @ pi[cj] / (commpi[j])**2
+
+        return tJI
+
     def construct_coarse_rate_matrix_from_MFPTs(self, temp):
         """ Calculate a rate matrix using  MFPTs between communities."""
         """ 
+        if self.K is None:
+            logpi, Kmat = self.read_ktn_info(f'T{temp:.3f}', log=True)
+            pi = np.exp(logpi)
+            self.K = Kmat
+            self.pi = pi/pi.sum()
+            commpi = self.get_comm_stat_probs(logpi, log=False)
+            self.commpi = commpi/commpi.sum()
         parse = ParsedPathsample(self.path/'pathdata')
         files_to_modify = [self.path/'min.A', self.path/'min.B']
         for f in files_to_modify:
@@ -335,11 +381,11 @@ class Analyze_KTN(object):
                     parse.append_input('TEMPERATURE', f'{temp}')
                     parse.write_input(self.path/'pathdata')
                     #run PATHSAMPLE
-                    outfile = self.path/f'out.{ci+1}.{cj+1}.T{temp}'
-                    os.system(f"{PATHSAMPLE} > {outfile}")
+                    outfile = open(self.path/f'out.{ci+1}.{cj+1}.T{temp}', 'w')
+                    subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
                     #parse output
                     output = {}
-                    with open(outfile) as f:
+                    with open(self.path/f'out.{ci+1}.{cj+1}.T{temp}', 'r') as f:
                         for line in f:
                             if not line:
                                 continue
@@ -360,17 +406,13 @@ class Analyze_KTN(object):
         """
         # get R from matrix of MFPTs
         N = len(self.communities)
-        logpi, Kmat = self.read_ktn_info(f'T{temp:.2f}', log=True)
-        pi = np.exp(logpi)
-        pi = pi/pi.sum()
-        commpi = self.get_comm_stat_probs(logpi, log=False)
-        D_N = np.diag(commpi)
-        mfpt = self.get_MFPT_between_communities(Kmat, pi)
+        D_N = np.diag(self.commpi)
+        mfpt = self.get_MFPT_between_communities(self.K, self.pi)
         
         matrix_of_ones = np.ones((N,1))@np.ones((1,N))
         #R_MFPT = inv(MFPT)@(inv(D_N) - matrix_of_ones)
-        R_MFPT = spla.solve(mfpt,np.diag(1.0/commpi) - matrix_of_ones)
-        self.check_detailed_balance(np.log(commpi), R_MFPT)
+        R_MFPT = spla.solve(mfpt,np.diag(1.0/self.commpi) - matrix_of_ones)
+        self.check_detailed_balance(np.log(self.commpi), R_MFPT)
         return R_MFPT
 
     def get_free_energies_from_rates(self, R, thresh, temp, kB=1.0, planck=1.0):
@@ -381,7 +423,8 @@ class Analyze_KTN(object):
         #subtract diagonal from R to recover only postive/zero entries
         R_nodiag = R - np.diag(np.diag(R))
         #replace any negative, near-zero entries with zero
-        R_nodiag = np.where(np.abs(R_nodiag) < 1.E-13, np.zeros_like(R_nodiag), R_nodiag)
+        if np.any(R_nodiag < 0.0):
+            R_nodiag = np.where(np.abs(R_nodiag) < 1.E-13, np.zeros_like(R_nodiag), R_nodiag)
         #print(R_nodiag)
         if np.any(R_nodiag < 0.0):
             raise ValueError('The rate matrix R has negative entries.')
@@ -585,6 +628,7 @@ class Analyze_KTN(object):
         logpi = np.log(pi)
         assert(len(pi) == Kmat_connected.shape[0])
         assert(Kmat_connected.shape[0] == Kmat_connected.shape[1])
+        assert(np.all(np.abs(Kmat_connected@pi)<1.E-10))
 
         if log:
             return logpi, Kmat_connected 
@@ -627,26 +671,27 @@ class Analyze_KTN(object):
         else:
             return commpi
 
-    def check_detailed_balance(self, logpi, K):
+    def check_detailed_balance(self, pi, K):
         """ Check if network satisfies detailed balance condition, which is
         thatthat :math:`k_{ij} \pi_j = k_{ji} \pi_i` for all :math:`i,j`.
 
         Parameters
         ----------
-        logpi : list (nnodes,) or (ncomms,)
-            log stationary probabilities
+        pi : list (nnodes,) or (ncomms,)
+            stationary probabilities
         K : np.ndarray (nnodes, nnodes) or (ncomms, ncomms)
             inter-minima rate constants in matrix form
 
         """
         for i in range(K.shape[0]):
             for j in range(K.shape[1]):
-                if i < j and K[i,j] > 0.0:
-                    left = np.log(K[i,j]) + logpi[j]
-                    right = np.log(K[j,i]) + logpi[i]
+                if i < j:
+                    left = K[i,j]*pi[j]
+                    right = K[j,i]*pi[i]
                     diff = abs(left - right)
                     if (diff > 1.E-10):
-                        print(f'Detailed balance not satisfied for i={i}, j={j}')
+                        #print(f'Detailed balance not satisfied for i={i}, j={j}')
+                        return False
 
     @staticmethod
     def read_communities(commdat):
@@ -685,14 +730,15 @@ def compare_HS_LEA():
     temps = [0.7, 0.8, 0.9, 1.0, 10.,
              20., 30., 40., 50., 60., 70., 80., 90., 100.]
     nrgthreshs = [1, 5, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
-    dfs = []
+    bigdfs = []
     for temp in temps:
+        dfs = []
         for thresh in nrgthreshs:
             df = pd.DataFrame()
             df['T'] = [temp]
             df['Gthresh'] = [thresh]
             ktn = Analyze_KTN('/scratch/dk588/databases/modelA',
-                            commdata=f'communities_G{thresh:.2f}_T{temp:.2f}.dat')
+                              thresh=thresh, temp=temp)
             labels = []
             matrices = []
             try:
@@ -709,14 +755,21 @@ def compare_HS_LEA():
             except Exception as e:
                 print(f'Hummer Szabo had the following error: {e}')
 
-
+            """
             try:
                 Rngt = ktn.construct_coarse_rate_matrix_from_MFPTs(temp)
                 matrices.append(Rngt)
                 labels.append('NGT')
             except Exception as e:
                 print(f'NGT had the following error: {e}')
-            
+            """
+            try:
+                Rlea = ktn.construct_coarse_rate_matrix_LEA(temp)
+                matrices.append(Rlea)
+                labels.append('LEA')
+            except Exception as e:
+                print(f'LEA had the following error: {e}')
+
             if len(matrices)==0:
                 continue
 
@@ -735,27 +788,63 @@ def compare_HS_LEA():
                                 ktn.path/f'ts.data.T{temp:.2f}']
                 for j, f in enumerate(og_input_files):
                     os.system(f'mv {f} {f}.original')
-                    os.system(f'mv {new_input_files[j]} {f}')
+                    os.system(f'cp {new_input_files[j]} {f}')
                 #run PATHSAMPLE
                 parse = ParsedPathsample(ktn.path/'pathdata')
                 parse.append_input('TEMPERATURE', temp)
                 parse.comment_input('REGROUPFREE')
                 parse.comment_input('DUMPGROUPS')
+                parse.comment_input('WAITPDF')
                 parse.append_input('NGT', '0 T')
                 parse.write_input(ktn.path/'pathdata')
-                outfile = parse.path/f'out.{thresh:.1f}.T{temp:.1f}'
-                os.system(f"{PATHSAMPLE} > {outfile}")
+                outfile = open(parse.path/f'out.{thresh:.1f}.T{temp:.1f}.ngt','w')
+                subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=ktn.path)
                 #parse output
-                parse.parse_output(outfile=outfile)
-                for j, f in enumerate(og_input_files):
-                    os.system(f'mv {f} {new_input_files[j]}')
-                    os.system(f'mv {f}.original {f}')
+                parse.parse_output(outfile=parse.path/f'out.{thresh:.1f}.T{temp:.1f}.ngt')
                 #return rates k(C1<-C2), k(C2<-C1)
-                df[f'kAB_{labels[i]}'] = [parse.output['kAB']]
-                df[f'kBA_{labels[i]}'] = [parse.output['kBA']]
+                #df[f'kAB_{labels[i]}'] = [parse.output['kAB']]
+                df[f'MFPTAB_{labels[i]}'] = [parse.output['MFPTAB']]
+                #df[f'kBA_{labels[i]}'] = [parse.output['kBA']]
+                df[f'MFPTBA_{labels[i]}'] = [parse.output['MFPTBA']]
+                #now run waitpdf on the coarse network
+                parse.comment_input('NGT')
+                parse.append_input('WAITPDF', '')
+                parse.write_input(ktn.path/'pathdata')
+                outfile = open(parse.path/f'out.{thresh:.1f}.T{temp:.1f}.waitpdf','w')
+                subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=ktn.path)
+                #parse output
+                parse.parse_output(outfile=parse.path/f'out.{thresh:.1f}.T{temp:.1f}.waitpdf')
+                if 'tau*AB' in parse.output:
+                    #df[f'k*AB_{labels[i]}'] = [1.0/parse.output['tau*AB']]
+                    df[f'tau*AB_{labels[i]}'] = [parse.output['tau*AB']]
+                else:
+                    #df[f'k*AB_{labels[i]}'] = np.nan
+                    df[f'tau*AB_{labels[i]}'] = np.nan
+                if 'tau*BA' in parse.output:
+                    #df[f'k*BA_{labels[i]}'] = [1.0/parse.output['tau*BA']]
+                    df[f'tau*BA_{labels[i]}'] = [parse.output['tau*BA']]
+                else:
+                    #df[f'k*BA_{labels[i]}'] = np.nan
+                    df[f'tau*BA_{labels[i]}'] = np.nan
+                #return original min.data / ts.data files
+                for j, f in enumerate(og_input_files):
+                    os.system(f'mv {f}.original {f}')
             dfs.append(df)
-    bigdf = pd.concat(dfs, ignore_index=True)
-    bigdf.to_csv('csvs/rates_HS_NGT_modelA_replaceNeg13.csv')
+        bigdf = pd.concat(dfs, ignore_index=True, sort=False)
+        scan = ScanPathsample(ktn.path/'pathdata', suffix='scan_MFPT_exact')
+        scan.parse.comment_input('WAITPDF')
+        rates = scan.run_NGT_exact()
+        bigdf['MFPTexactAB'] = rates['MFPTAB']
+        bigdf['MFPTexactBA'] = rates['MFPTBA']
+        bigdfs.append(bigdf)
+    biggerdf = pd.concat(bigdfs, ignore_index=True)
+    #if file exists, append to existing data
+    csv = Path('csvs/rates_LEA_HS_HSK_modelA_MFPT_waitpdf2.csv')
+    #if csv.is_file():
+    #    olddf = pd.read_csv(csv)
+    #    bigdf = olddf.append(bigdf)
+    #write updated file to csv
+    biggerdf.to_csv(csv, index=False)
 
 def compute_HS_matrices(temp):
 
