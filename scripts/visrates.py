@@ -230,15 +230,16 @@ def plot_NGT_arrhenius_modelA(thresh):
     fig.tight_layout()
     plt.savefig(f'plots/modelA_kLEA_kHS_kNGT_Neg13_arrhenius_Gthresh{thresh}_BA.pdf')
 
-def plot_ratios_modelA_waitpdf(thresh):
+def plot_ratios_modelA_waitpdf(thresh=100):
     """Compare rates from LEA vs. HS vs. NGT at a regrouping threshold."""
-    df = pd.read_csv('csvs/rates_LEA_HS_HSK_modelA_MFPT_waitpdf2.csv')
+    df = pd.read_csv('csvs/rates_LEA_HS_HSK_modelA_MFPT_waitpdf3.csv')
     df = df.set_index('Gthresh')
     colors = sns.color_palette("Dark2", 3)
     df2 = df.xs(thresh)
     df2= df2.sort_values('T')
     df2 =df2[df2['T']>=1.0] 
     rates = ['LEA', 'HSK', 'HS']
+    labels = ['LEA', 'KRA', 'HS']
     symbols = ['-s', '-o', '--^']
     numerators = ['MFPT','tau*']
     #denom = 'kNGTexact'
@@ -250,7 +251,7 @@ def plot_ratios_modelA_waitpdf(thresh):
         #then only plot HSK for temperatures that are not NaN
         df2CG = df2[-df2[f'MFPTBA_{CG}'].isna()]
         ax.plot(1./df2CG['T'], df2CG[f'MFPTBA_{CG}']/df2CG[f'{denom}BA'],
-                symbols[j], label=CG, color=colors[j], linewidth=1,
+                symbols[j], label=labels[j], color=colors[j], linewidth=1,
                 markersize=4)
     ax.set_xlabel(r'$1/T$')
     ax.legend(frameon=True)
@@ -258,19 +259,19 @@ def plot_ratios_modelA_waitpdf(thresh):
         #then only plot HSK for temperatures that are not NaN
         df2CG = df2[-df2[f'tau*BA_{CG}'].isna()]
         ax2.plot(1./df2CG['T'], df2CG[f'tau*BA_{CG}']/df2CG[f'{denom}BA'],
-                symbols[j], label=CG, color=colors[j], linewidth=1,
+                symbols[j], label=labels[j], color=colors[j], linewidth=1,
                 markersize=4)
     ax2.set_xlabel(r'$1/T$')
     ax2.legend(frameon=True)
     fig.subplots_adjust(left=0.12, top=0.97, right=0.99, bottom=0.11,
                         wspace=0.325)
-    plt.savefig(f'plots/modelA_compare_LEA_HS_HSK_ratio_Gthresh{thresh}_BA.eps',
+    plt.savefig(f'plots/modelA_compare_LEA_HS_HSK_ratio_Gthresh{thresh}_BA_try2.eps',
                 format='eps', dpi=1000,
                 bbox_inches='tight')
 
 def plot_ratios_modelA(thresh):
     """Compare rates from LEA vs. HS vs. NGT at a regrouping threshold."""
-    df = pd.read_csv('csvs/rates_LEA_HS_HSK_modelA_MFPT_waitpdf2.csv')
+    df = pd.read_csv('csvs/rates_LEA_HS_HSK_modelA_MFPT_waitpdf3.csv')
     df = df.set_index('Gthresh')
     colors = sns.color_palette("Dark2", 3)
     df2 = df.xs(thresh)
@@ -287,48 +288,46 @@ def plot_ratios_modelA(thresh):
         for j, CG in enumerate(rates):
             #then only plot HSK for temperatures that are not NaN
             df2CG = df2[-df2[f'{k}AB_{CG}'].isna()]
-            ax.plot(1./df2CG['T'], df2CG[f'{k}AB_{CG}']/df2CG[f'{denom}AB'],
+            ax.plot(1./df2CG['T'],
+                    np.array(df2CG[f'{k}AB_{CG}'])/np.array(df2CG[f'{denom}AB']),
                     symbols[j], label=CG, color=colors[j], linewidth=1)
         plt.xlabel(r'$1/T$')
         #plt.yscale('log')
-        """
         if k=='k':
-            plt.ylabel(r'$k^{F\hspace{1em} CG}_{A\leftarrow B}/k^F_{A\leftarrow B}$')
+            plt.ylabel(r'$k^{F\hspace{1} CG}_{A\leftarrow B}/k^F_{A\leftarrow B}$')
         if k=='k*':
-            plt.ylabel(r'$k^{*\hspace{1em} CG}_{A\leftarrow B}/k^F_{A\leftarrow B}$')
+            plt.ylabel(r'$k^{*\hspace{1} CG}_{A\leftarrow B}/k^F_{A\leftarrow B}$')
         if k=='MFPT':
-            plt.ylabel(r'$\tau^{F\hspace{1em} CG}_{A\leftarrow B}/\tau^F_{A\leftarrow B}$')
+            plt.ylabel(r'$\tau^{F\hspace{1} CG}_{A\leftarrow B}/\tau^F_{A\leftarrow B}$')
         if k=='tau*':
-            plt.ylabel(r'$\tau^{*\hspace{1em} CG}_{A\leftarrow B}/\tau^F_{A\leftarrow B}$')
-        """
-        #plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+            plt.ylabel(r'$\tau^{*\hspace{1} CG}_{A\leftarrow B}/\tau^F_{A\leftarrow B}$')
+        plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
         plt.legend()
         fig.tight_layout()
-        plt.savefig(f'plots/modelA_{k}_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_AB.pdf')
+        #plt.savefig(f'plots/modelA_{k}_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_AB.pdf')
 
         #next plot B<-A direction
         fig, ax = plt.subplots()
         for j, CG in enumerate(rates):
             #then only plot HSK for temperatures that are not NaN
             df2CG = df2[-df2[f'{k}BA_{CG}'].isna()]
-            ax.plot(1./df2CG['T'], df2CG[f'{k}BA_{CG}']/df2CG[f'{denom}BA'],
+            ax.plot(1./df2CG['T'],
+                    np.array(df2CG[f'{k}BA_{CG}'])/np.array(df2CG[f'{denom}BA']),
                     symbols[j], label=CG, color=colors[j], linewidth=1)
         plt.xlabel(r'$1/T$')
         #plt.yscale('log')
-        """
         if k=='k':
-            plt.ylabel(r'$k^{F\hspace{1em} CG}_{B\leftarrow A}/k^F_{B\leftarrow A}$')
+            plt.ylabel(r'$k^{F\hspace{1} CG}_{B\leftarrow A}/k^F_{B\leftarrow A}$')
         if k=='k*':
-            plt.ylabel(r'$k^{*\hspace{1em} CG}_{B\leftarrow A}/k^F_{B\leftarrow A}$')
+            plt.ylabel(r'$k^{*\hspace{1} CG}_{B\leftarrow A}/k^F_{B\leftarrow A}$')
         if k=='MFPT':
-            plt.ylabel(r'$\tau^{F\hspace{1em} CG}_{B\leftarrow A}/\tau^F_{B\leftarrow A}$')
+            plt.ylabel(r'$\tau^{F\hspace{1} CG}_{B\leftarrow A}/\tau^F_{B\leftarrow A}$')
         if k=='tau*':
-            plt.ylabel(r'$\tau^{*\hspace{1em} CG}_{B\leftarrow A}/\tau^F_{B\leftarrow A}$')
-        """
-        #plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+            plt.ylabel(r'$\tau^{*\hspace{1} CG}_{B\leftarrow A}/\tau^F_{B\leftarrow A}$')
+        plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
         plt.legend()
         fig.tight_layout()
-        plt.savefig(f'plots/modelA_{k}_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_BA.pdf')
+        #plt.savefig(f'plots/modelA_{k}_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_BA.pdf')
 
     #next plot k*RG/k^FRG
     #first plot A<-B direction
@@ -340,11 +339,11 @@ def plot_ratios_modelA(thresh):
                 symbols[j], label=CG, color=colors[j], linewidth=1)
     plt.xlabel(r'$1/T$')
     #plt.yscale('log')
-    #plt.ylabel(r'$\tau^{*\hspace{0.5em} CG}_{A\leftarrow B}/\tau^{F\hspace{0.5em} CG}_{A\leftarrow B}$')
+    plt.ylabel(r'$\tau^{*\hspace{0.5} CG}_{A\leftarrow B}/\tau^{F\hspace{0.5} CG}_{A\leftarrow B}$')
     #plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
     plt.legend()
     fig.tight_layout()
-    plt.savefig(f'plots/modelA_mfpt*F_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_AB.pdf')
+    #plt.savefig(f'plots/modelA_mfpt*F_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_AB.pdf')
 
     #next plot B<-A direction
     fig, ax = plt.subplots()
@@ -355,11 +354,73 @@ def plot_ratios_modelA(thresh):
                 symbols[j], label=CG, color=colors[j], linewidth=1)
     plt.xlabel(r'$1/T$')
     #plt.yscale('log')
-    #plt.ylabel(r'$\tau^{*\hspace{0.5em} CG}_{B\leftarrow A}/\tau^{F\hspace{0.5em} CG}_{B\leftarrow A}$')
-    #plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+    plt.ylabel(r'$\tau^{*\hspace{0.5} CG}_{B\leftarrow A}/\tau^{F\hspace{0.5} CG}_{B\leftarrow A}$')
+    plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
     plt.legend()
     fig.tight_layout()
-    plt.savefig(f'plots/modelA_k*kF_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_BA.pdf')
+    #plt.savefig(f'plots/modelA_k*kF_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_BA.pdf')
+
+def plot_arrhenius_modelA(thresh):
+    """Compare rates from LEA vs. HS vs. NGT at a regrouping threshold."""
+    df = pd.read_csv('csvs/rates_LEA_HS_HSK_modelA_MFPT_waitpdf333.csv')
+    df = df.set_index('Gthresh')
+    colors = sns.color_palette("Dark2", 3)
+    df2 = df.xs(thresh)
+    df2= df2.sort_values('T')
+    df2 =df2[df2['T']>=1.0] 
+    rates = ['LEA', 'HSK', 'HS']
+    symbols = ['-s', '-o', '--^']
+    numerators = ['MFPT','tau*']
+    #denom = 'kNGTexact'
+    denom = 'MFPTexact'
+    for i, k in enumerate(numerators): 
+        #first plot A<-B direction
+        fig, ax = plt.subplots()
+        for j, CG in enumerate(rates):
+            #then only plot HSK for temperatures that are not NaN
+            df2CG = df2[-df2[f'{k}AB_{CG}'].isna()]
+            ax.plot(1./df2CG['T'], df2CG[f'{k}AB_{CG}'],
+                    symbols[j], label=CG, color=colors[j], linewidth=1)
+        ax.plot(1./df2['T'], df2[f'{denom}AB'], '-^', color='k', linewidth=1,
+                label='NGT')
+        plt.xlabel(r'$1/T$')
+        plt.yscale('log')
+        if k=='k':
+            plt.ylabel(r'$k^{F\hspace{1} CG}_{A\leftarrow B}$')
+        if k=='k*':
+            plt.ylabel(r'$k^{*\hspace{1} CG}_{A\leftarrow B}$')
+        if k=='MFPT':
+            plt.ylabel(r'$\tau^{F\hspace{1} CG}_{A\leftarrow B}$')
+        if k=='tau*':
+            plt.ylabel(r'$\tau^{*\hspace{1} CG}_{A\leftarrow B}$')
+        plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+        plt.legend()
+        fig.tight_layout()
+        #plt.savefig(f'plots/modelA_{k}_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_AB.pdf')
+
+        #next plot B<-A direction
+        fig, ax = plt.subplots()
+        for j, CG in enumerate(rates):
+            #then only plot HSK for temperatures that are not NaN
+            df2CG = df2[-df2[f'{k}BA_{CG}'].isna()]
+            ax.plot(1./df2CG['T'], df2CG[f'{k}BA_{CG}'],
+                    symbols[j], label=CG, color=colors[j], linewidth=1)
+        ax.plot(1./df2['T'], df2[f'{denom}AB'], '-^', color='k', linewidth=1,
+                label='NGT')
+        plt.xlabel(r'$1/T$')
+        plt.yscale('log')
+        if k=='k':
+            plt.ylabel(r'$k^{F\hspace{1} CG}_{B\leftarrow A}$')
+        if k=='k*':
+            plt.ylabel(r'$k^{*\hspace{1} CG}_{B\leftarrow A}$')
+        if k=='MFPT':
+            plt.ylabel(r'$\tau^{F\hspace{1} CG}_{B\leftarrow A}$')
+        if k=='tau*':
+            plt.ylabel(r'$\tau^{*\hspace{1} CG}_{B\leftarrow A}$')
+        plt.title(r'$\Delta G^{RG}$ = ' + f'{thresh}')
+        plt.legend()
+        fig.tight_layout()
+        #plt.savefig(f'plots/modelA_{k}_LEA_HS_HSK_Neg13_ratio_Gthresh{thresh}_BA.pdf')
 
 def plot_NGT_arrhenius_LJ38(thresh):
     """Compare rates from LEA vs. HS vs. NGT at a regrouping threshold."""

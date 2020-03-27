@@ -18,33 +18,16 @@ from scipy.sparse import csr_matrix
 from scipy.linalg import eig
 from scipy.linalg import expm
 from pathlib import Path
-from matplotlib import pyplot as plt
-import seaborn as sns
-sns.set()
 import pandas as pd
 import os
 import subprocess
 
 PATHSAMPLE = "/home/dk588/svn/PATHSAMPLE/build/gfortran/PATHSAMPLE"
-params = {'axes.edgecolor': 'black', 'axes.facecolor':'white', 
-          'axes.grid': False, 'axes.titlesize': 20.0,
-          'axes.linewidth': 0.75, 'backend': 'pdf','axes.labelsize':
-          18,'legend.fontsize': 18,
-          'xtick.labelsize': 18,'ytick.labelsize': 18,'text.usetex':
-          False,'figure.figsize': [7, 5],
-          'mathtext.fontset': 'stixsans', 'savefig.format': 'pdf',
-          'xtick.bottom':True, 'xtick.major.pad': 5, 'xtick.major.size': 5,
-          'xtick.major.width': 0.5,
-          'ytick.left':True, 'ytick.right':False, 'ytick.major.pad': 5,
-          'ytick.major.size': 5, 'ytick.major.width': 0.5,
-          'ytick.minor.right':False, 'lines.linewidth':2}
-
-plt.rcParams.update(params)
 
 class Analyze_KTN(object):
 
     def __init__(self, path, communities=None,
-                 commdata=None, pathsample=None):
+                 commdata=None, temp=None, thresh=None, pathsample=None):
         self.path = Path(path) #path to directory with all relevant files
         self.K = None
         self.pi = None
@@ -232,17 +215,18 @@ class Analyze_KTN(object):
         mat_to_invert = pi_col@np.ones((1,V)) - self.K
         first_inverse = spla.inv(mat_to_invert)
         #check that Pi = M^T pi
-        Pi_calc = M.T@pi
+        Pi_calc = M.T@self.pi
         for entry in np.abs(self.commpi - Pi_calc):
             assert(entry < 1.0E-10)
 
         #H-S relation
         second_inversion = spla.inv(M.T@first_inverse@D_V@M)
         R_HS = Pi_col@np.ones((1,N)) - D_N@second_inversion
-        self.check_detailed_balance(np.log(self.commpi), R_HS)
+        if not self.check_detailed_balance(np.log(self.commpi), R_HS):
+            print(f'HS does not satisfy detailed balance at T={temp}')
         return R_HS
 
-    def hummer_szabo_from_mfpt(self, temp):
+    def hummer_szabo_from_mfpt(self, temp, GT=True, mfpt=None):
         """Calculate Hummer-Szabo coarse-grained rate matrix using Eqn. (72)
         of Kells et al. (2019) paper on correlation functions and the Kemeny
         constant."""
@@ -268,11 +252,15 @@ class Analyze_KTN(object):
 
         Pi_col = self.commpi.reshape((N, 1))
         pi_col = self.pi.reshape((n, 1))
-        mfpt = self.get_MFPT_from_Kmat(self.K)
-        R = Pi_col@np.ones((1,N)) - spla.inv(Pi_col@np.ones((1,N)) +
-                                 M.T@D_n@mfpt@pi_col@np.ones((1,N)) -
-                                 M.T@D_n@mfpt@D_n@M@np.diag(1./self.commpi))
-        self.check_detailed_balance(np.log(self.commpi), R)
+        if GT:
+            mfpt = self.get_MFPT_between_states_GT(temp)
+        elif mfpt is None:
+            mfpt = self.get_MFPT_from_Kmat(self.K)
+        R = Pi_col@np.ones((1,N)) - D_N@spla.inv(Pi_col@Pi_col.T +
+                                                 M.T@D_n@mfpt@pi_col@Pi_col.T -
+                                                 M.T@D_n@mfpt@D_n@M)
+        if not self.check_detailed_balance(np.log(self.commpi), R):
+            print(f'KRA does not satisfy detailed balance at T={temp}')
         return R
 
     def get_MFPT_from_Kmat(self, K):
@@ -283,7 +271,7 @@ class Analyze_KTN(object):
         mfpt = np.zeros((n,n))
         for i in range(n):
             for j in range(n):
-                if i==0 and j==0:
+                if i==j:
                     mfpt[i][j] = 0.
                 else:
                     try:
@@ -291,7 +279,6 @@ class Analyze_KTN(object):
                                                 (np.arange(n)==j)[np.arange(n)!=i]).sum()
                     except scipy.linalg.LinAlgWarning as err:
                         raise Exception('LinAlgWarning') 
-
         return mfpt
 
     def get_MFPT_between_communities(self, K, pi):
@@ -320,45 +307,10 @@ class Analyze_KTN(object):
 
         return mfpt
 
-    def check_kells_mfpt_condition(self, pi, commpi, mfpt):
-        """Comppute the t_JI as defined in Eqn. 66 in Kells, Rosta,
-        Annibale (2019)."""
+    def get_MFPT_between_communities_GT(self, temp):
+        """Use PATHSAMPLE to compute MFPTs between communities
+        using a rate matrix K."""
 
-        N = len(self.communities)
-        tJI = np.zeros((N,N))
-        for i in range(N):
-            for j in range(N):
-                ci = np.array(self.communities[i+1]) - 1
-                cj = np.array(self.communities[j+1]) - 1
-                tJI[j][i] = pi[cj]@ mfpt[cj,:][:,ci] @ pi[ci] / (commpi[i]*commpi[j])
-                tJI[j][i] -= pi[cj] @ mfpt[cj,:][:,cj] @ pi[cj] / (commpi[j])**2
-
-        return tJI
-
-    def check_mfpt_equivalence(self, pi, commpi, mfpt):
-
-        N = len(self.communities)
-        tJI = np.zeros((N,N))
-        for i in range(N):
-            for j in range(N):
-                ci = np.array(self.communities[i+1]) - 1
-                cj = np.array(self.communities[j+1]) - 1
-                numInJ = len(cj)
-                tJI[j][i] = np.ones((1,numInJ))@ mfpt[cj,:][:,ci] @ pi[ci] / commpi[i]
-                tJI[j][i] -= pi[cj] @ mfpt[cj,:][:,cj] @ pi[cj] / (commpi[j])**2
-
-        return tJI
-
-    def construct_coarse_rate_matrix_from_MFPTs(self, temp):
-        """ Calculate a rate matrix using  MFPTs between communities."""
-        """ 
-        if self.K is None:
-            logpi, Kmat = self.read_ktn_info(f'T{temp:.3f}', log=True)
-            pi = np.exp(logpi)
-            self.K = Kmat
-            self.pi = pi/pi.sum()
-            commpi = self.get_comm_stat_probs(logpi, log=False)
-            self.commpi = commpi/commpi.sum()
         parse = ParsedPathsample(self.path/'pathdata')
         files_to_modify = [self.path/'min.A', self.path/'min.B']
         for f in files_to_modify:
@@ -377,6 +329,8 @@ class Analyze_KTN(object):
                     parse.minB = np.array(communities[cj+1]) - 1
                     parse.numInB = len(communities[cj+1])
                     parse.write_minA_minB(self.path/'min.A', self.path/'min.B')
+                    os.system(f'cat {self.path}/min.A')
+                    os.system(f'cat {self.path}/min.B')
                     parse.append_input('NGT', '0 T')
                     parse.append_input('TEMPERATURE', f'{temp}')
                     parse.write_input(self.path/'pathdata')
@@ -384,30 +338,131 @@ class Analyze_KTN(object):
                     outfile = open(self.path/f'out.{ci+1}.{cj+1}.T{temp}', 'w')
                     subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
                     #parse output
-                    output = {}
-                    with open(self.path/f'out.{ci+1}.{cj+1}.T{temp}', 'r') as f:
-                        for line in f:
-                            if not line:
-                                continue
-                            words = line.split()
-                            if len(words) > 1:
-                                if words[0] == 'NGT>' and words[1]=='MFPT(A<-B)=':
-                                    output['MFPTAB'] = float(words[2])
-                                    output['MFPTBA'] = float(words[4])
-                                    #this is the last line we're interested in
-                                    break
-                    MFPT[ci, cj] = output['MFPTAB']
-                    MFPT[cj, ci] = output['MFPTBA']
+                    parse.parse_output(outfile=self.path/f'out.{ci+1}.{cj+1}.T{temp}')
+                    MFPT[ci, cj] = parse.output['MFPTAB']
+                    MFPT[cj, ci] = parse.output['MFPTBA']
 
         print(MFPT)
         #restore original min.A and min.B files
         for f in files_to_modify:
             os.system(f'mv {f}.original {f}')
+
+        return MFPT
+
+    def get_MFPT_between_states_GT(self, temp):
+        """Use PATHSAMPLE to compute MFPTs between states
+        using a rate matrix K."""
+
+        parse = ParsedPathsample(self.path/'pathdata')
+        files_to_modify = [self.path/'min.A', self.path/'min.B']
+        for f in files_to_modify:
+            if not f.exists():
+                print(f'File {f} does not exists')
+                raise FileNotFoundError 
+            os.system(f'mv {f} {f}.original')
+        
+        parse.append_input('NGT', '0 T')
+        parse.comment_input('WAITPDF')
+        parse.append_input('TEMPERATURE', f'{temp}')
+        parse.write_input(self.path/'pathdata')
+        n = len(self.pi)
+        mfpt = np.zeros((n,n))
+        for i in range(n):
+            for j in range(n):
+                if i < j:
+                    parse.minA = [i] 
+                    parse.numInA = 1
+                    parse.minB = [j]
+                    parse.numInB = 1
+                    parse.write_minA_minB(self.path/'min.A', self.path/'min.B')
+                    #run PATHSAMPLE
+                    outfile_name = self.path/f'out.{i+1}.{j+1}.T{temp}'
+                    outfile = open(outfile_name, 'w')
+                    subprocess.run(f"{PATHSAMPLE}", stderr=subprocess.STDOUT, stdout=outfile, cwd=self.path)
+                    #parse output
+                    parse.parse_output(outfile=self.path/f'out.{i+1}.{j+1}.T{temp}')
+                    mfpt[i, j] = parse.output['MFPTAB']
+                    mfpt[j, i] = parse.output['MFPTBA']
+                    Path(outfile_name).unlink()
+                    print(f'Calculated MFPT for states ({i}, {j})')
+
+        #restore original min.A and min.B files
+        for f in files_to_modify:
+            os.system(f'mv {f}.original {f}')
+
+        return mfpt
+
+    def get_kells_cluster_passage_times(self, pi, commpi, mfpt):
+        """Comppute the t_JI as defined in Eqn. 66 in Kells, Rosta,
+        Annibale (2019)."""
+
+        N = len(self.communities)
+        tJI = np.zeros((N,N))
+        for i in range(N):
+            for j in range(N):
+                ci = np.array(self.communities[i+1]) - 1
+                cj = np.array(self.communities[j+1]) - 1
+                tJI[j][i] = pi[cj]@ mfpt[cj,:][:,ci] @ pi[ci] / (commpi[i]*commpi[j])
+                tJI[j][i] -= pi[cj] @ mfpt[cj,:][:,cj] @ pi[cj] / (commpi[j])**2
+
+        return tJI
+
+    def get_approx_kells_cluster_passage_times(self, pi, commpi, mfpt):
+        """Compute an approximation to t_JI as defined in Eqn. 66 in Kells, Rosta,
+        Annibale (2019) in which we assume that all mfpt's tji from any state i
+        in I to any state j in J are the same. In this approximation, whose
+        accuracy depends on the degree of metastability, we can approximate
+        t_JI by a single mfpt between i* and j* where i* and j* are the local minima of I
+        and J respectively.
+        NOTE: problem with local min is that they may have very little
+        occupation probability, in which case it doesnt make sense to choose
+        it.
+        Other possibility: keep choosing (i,j) pairs and montecarlo sample them
+        and take an average or something?
         """
+
+        N = len(self.communities)
+        tJI = np.zeros((N,N))
+        for i in range(N):
+            for j in range(N):
+                ci = np.array(self.communities[i+1]) - 1
+                cj = np.array(self.communities[j+1]) - 1
+                #find local min i* in ci and j* in cj (sort by energy)
+                #tji = get_mfpt_between_states_GT()
+                tJI[j][i] = pi[cj]@ mfpt[cj,:][:,ci] @ pi[ci] / (commpi[i]*commpi[j])
+                #tJI[j][i] -= pi[cj] @ mfpt[cj,:][:,cj] @ pi[cj] / (commpi[j])**2
+
+        return tJI
+
+    def check_mfpt_equivalence(self, pi, commpi, mfpt):
+        N = len(self.communities)
+        tJI = np.zeros((N,N))
+        for i in range(N):
+            for j in range(N):
+                ci = np.array(self.communities[i+1]) - 1
+                cj = np.array(self.communities[j+1]) - 1
+                numInJ = len(cj)
+                tJI[j][i] = np.ones((1,numInJ))@ mfpt[cj,:][:,ci] @ pi[ci] / commpi[i]
+                tJI[j][i] -= pi[cj] @ mfpt[cj,:][:,cj] @ pi[cj] / (commpi[j])**2
+
+        return tJI
+
+    def construct_coarse_rate_matrix_from_MFPTs(self, temp, GT=False):
+        """ Calculate a rate matrix using  MFPTs between communities."""
+        if self.K is None:
+            logpi, Kmat = self.read_ktn_info(f'T{temp:.2f}', log=True)
+            pi = np.exp(logpi)
+            self.K = Kmat
+            self.pi = pi/pi.sum()
+            commpi = self.get_comm_stat_probs(logpi, log=False)
+            self.commpi = commpi/commpi.sum()
         # get R from matrix of MFPTs
         N = len(self.communities)
         D_N = np.diag(self.commpi)
-        mfpt = self.get_MFPT_between_communities(self.K, self.pi)
+        if GT:
+            mfpt = self.get_MFPT_between_communities_GT()
+        else:
+            mfpt = self.get_MFPT_between_communities(self.K, self.pi)
         
         matrix_of_ones = np.ones((N,1))@np.ones((1,N))
         #R_MFPT = inv(MFPT)@(inv(D_N) - matrix_of_ones)
@@ -445,14 +500,19 @@ class Analyze_KTN(object):
                 commpi_renorm[idy[i]] = commpi_renorm[idx[i]]*dbalance 
         #calculate free energies for this connected set
         min_nrgs = {}
+        if temp==3.0:
+            print(commpi_renorm)
         for key in commpi_renorm:
-            min_nrgs[key] = -kB*temp*np.log(commpi_renorm[key])
+            if commpi_renorm[key] <= 0.0:
+                min_nrgs[key] = np.inf
+            else:
+                min_nrgs[key] = -kB*temp*np.log(commpi_renorm[key])
         if len(min_nrgs) != N:
             raise ValueError('The rate matrix R has unconnected components.')
         #create min.data file
-        minfree = np.loadtxt(f'G{thresh:.1f}/min.data.regrouped.{temp:.10f}.G{thresh:.1f}')
+        minfree = np.loadtxt(self.path/f'G{thresh:.1f}/min.data.regrouped.{temp:.10f}.G{thresh:.1f}')
         correction_factor = minfree[0, 1]
-        with open(self.path/f'min.data.T{temp:.2f}','w') as f:
+        with open(self.path/f'min.data.T{temp:.3f}','w') as f:
             for i in range(N):
                 f.write(f'{min_nrgs[i]} {correction_factor} 1 1.0 1.0 1.0\n') 
 
@@ -479,7 +539,7 @@ class Analyze_KTN(object):
         df['itx'] = 1.0
         df['ity'] = 1.0
         df['itz'] = 1.0
-        df.to_csv(self.path/f'ts.data.T{temp:.2f}',header=False, index=False, sep=' ')
+        df.to_csv(self.path/f'ts.data.T{temp:.3f}',header=False, index=False, sep=' ')
 
     def calc_eigenvectors(self, K, k, which_eig='SM', norm=False):
         # calculate k dominant eigenvectors and eigenvalues of sparse matrix
@@ -697,7 +757,7 @@ class Analyze_KTN(object):
     def read_communities(commdat):
         """Read in a single column file called communities.dat where each line
         is the community ID (zero-indexed) of the minima given by the line
-        numbenumber.
+        number.
         
         Parameters
         ----------
@@ -722,14 +782,15 @@ class Analyze_KTN(object):
 
 """Functions that use the Analyze_KTN class to perform useful tasks."""
 
-def compare_HS_LEA():
+def compare_HS_LEA(temps, nrgthreshs):
     """ Calculate coarse-grained rate matrices using the Hummer-Szabo, NGT, and LEA
     methods and compute kAB/kBA using NGT to be compared to the rates on the
     fulfull network. """
 
-    temps = [0.7, 0.8, 0.9, 1.0, 10.,
-             20., 30., 40., 50., 60., 70., 80., 90., 100.]
-    nrgthreshs = [1, 5, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    #temps = [0.7, 0.8, 0.9, 1.0, 1.2, 1.33, 1.5,
+    #         2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0,
+    #         10., 20., 30., 40., 50., 60., 70., 80., 90., 100.]
+    #nrgthreshs = [1, 5, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 50, 100]
     bigdfs = []
     for temp in temps:
         dfs = []
@@ -737,31 +798,24 @@ def compare_HS_LEA():
             df = pd.DataFrame()
             df['T'] = [temp]
             df['Gthresh'] = [thresh]
-            ktn = Analyze_KTN('/scratch/dk588/databases/modelA',
+            ktn = Analyze_KTN('/scratch/dk588/databases/LJ38.2010/4000.minima',
                               thresh=thresh, temp=temp)
             labels = []
             matrices = []
             try:
-                Rhs_mfpt = ktn.hummer_szabo_from_mfpt(temp)
+                Rhs_mfpt = ktn.hummer_szabo_from_mfpt(temp, GT=False,
+                                                      mfpt=np.load(f'csvs/mfpt_GT_LJ38_900minima_T{temp}.npy'))
                 matrices.append(Rhs_mfpt)
-                labels.append('HSK')
+                labels.append('KRA')
             except Exception as e:
                 print(f'Hummer Szabo Kells had the following error: {e}')
-
+            """
             try:
                 Rhs = ktn.construct_coarse_matrix_Hummer_Szabo(temp)
                 matrices.append(Rhs)
                 labels.append('HS')
             except Exception as e:
                 print(f'Hummer Szabo had the following error: {e}')
-
-            """
-            try:
-                Rngt = ktn.construct_coarse_rate_matrix_from_MFPTs(temp)
-                matrices.append(Rngt)
-                labels.append('NGT')
-            except Exception as e:
-                print(f'NGT had the following error: {e}')
             """
             try:
                 Rlea = ktn.construct_coarse_rate_matrix_LEA(temp)
@@ -784,8 +838,8 @@ def compare_HS_LEA():
                             ktn.path/'min.data', ktn.path/'ts.data']
                 new_input_files = [ktn.path/f'G{thresh:.1f}/min.A.regrouped.{temp:.10f}.G{thresh:.1f}',
                                 ktn.path/f'G{thresh:.1f}/min.B.regrouped.{temp:.10f}.G{thresh:.1f}',
-                                ktn.path/f'min.data.T{temp:.2f}',
-                                ktn.path/f'ts.data.T{temp:.2f}']
+                                ktn.path/f'min.data.T{temp:.3f}',
+                                ktn.path/f'ts.data.T{temp:.3f}']
                 for j, f in enumerate(og_input_files):
                     os.system(f'mv {f} {f}.original')
                     os.system(f'cp {new_input_files[j]} {f}')
@@ -794,24 +848,30 @@ def compare_HS_LEA():
                 parse.append_input('TEMPERATURE', temp)
                 parse.comment_input('REGROUPFREE')
                 parse.comment_input('DUMPGROUPS')
-                parse.comment_input('WAITPDF')
+                #parse.comment_input('WAITPDF')
                 parse.append_input('NGT', '0 T')
                 parse.write_input(ktn.path/'pathdata')
                 outfile = open(parse.path/f'out.{thresh:.1f}.T{temp:.1f}.ngt','w')
-                subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=ktn.path)
+                subprocess.run(f"{PATHSAMPLE}", stderr=subprocess.STDOUT, stdout=outfile, cwd=ktn.path)
                 #parse output
                 parse.parse_output(outfile=parse.path/f'out.{thresh:.1f}.T{temp:.1f}.ngt')
                 #return rates k(C1<-C2), k(C2<-C1)
-                #df[f'kAB_{labels[i]}'] = [parse.output['kAB']]
+                df[f'kAB_{labels[i]}'] = [parse.output['kAB']]
                 df[f'MFPTAB_{labels[i]}'] = [parse.output['MFPTAB']]
-                #df[f'kBA_{labels[i]}'] = [parse.output['kBA']]
+                df[f'kBA_{labels[i]}'] = [parse.output['kBA']]
                 df[f'MFPTBA_{labels[i]}'] = [parse.output['MFPTBA']]
                 #now run waitpdf on the coarse network
                 parse.comment_input('NGT')
+                """
                 parse.append_input('WAITPDF', '')
                 parse.write_input(ktn.path/'pathdata')
                 outfile = open(parse.path/f'out.{thresh:.1f}.T{temp:.1f}.waitpdf','w')
-                subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=ktn.path)
+                try:
+                    subprocess.run(f"{PATHSAMPLE}", stderr=subprocess.STDOUT,
+                                   stdout=outfile, cwd=ktn.path, timeout=5)
+                except subprocess.TimeoutExpired:
+                    print('WAITPDF expired 5s timeout. Setting tau*AB and' +
+                          ' tau*BA to NaN')
                 #parse output
                 parse.parse_output(outfile=parse.path/f'out.{thresh:.1f}.T{temp:.1f}.waitpdf')
                 if 'tau*AB' in parse.output:
@@ -826,32 +886,99 @@ def compare_HS_LEA():
                 else:
                     #df[f'k*BA_{labels[i]}'] = np.nan
                     df[f'tau*BA_{labels[i]}'] = np.nan
+                """
                 #return original min.data / ts.data files
                 for j, f in enumerate(og_input_files):
                     os.system(f'mv {f}.original {f}')
             dfs.append(df)
         bigdf = pd.concat(dfs, ignore_index=True, sort=False)
         scan = ScanPathsample(ktn.path/'pathdata', suffix='scan_MFPT_exact')
-        scan.parse.comment_input('WAITPDF')
+        #scan.parse.comment_input('WAITPDF')
         rates = scan.run_NGT_exact()
         bigdf['MFPTexactAB'] = rates['MFPTAB']
         bigdf['MFPTexactBA'] = rates['MFPTBA']
+        bigdf['kABexact'] = rates['kAB']
+        bigdf['kBAexact'] = rates['kBA']
         bigdfs.append(bigdf)
     biggerdf = pd.concat(bigdfs, ignore_index=True)
     #if file exists, append to existing data
-    csv = Path('csvs/rates_LEA_HS_HSK_modelA_MFPT_waitpdf2.csv')
+    csv = Path('csvs/rates_LEA_HS_HSK_LJ38_MFPT.csv')
     #if csv.is_file():
     #    olddf = pd.read_csv(csv)
     #    bigdf = olddf.append(bigdf)
     #write updated file to csv
     biggerdf.to_csv(csv, index=False)
 
+def calc_mfpt_AB_tom(temps):
+    """Calculate the mean first passage time A<-B and B<-A on the full network
+    for each of the temperatures specified using Tom's absorbing Markov chain
+    method."""
+    
+    data = np.zeros((len(temps), 3))
+    data[:,0] = temps
+    n=8
+    for i, temp in enumerate(temps):
+        #free energy threshold doesn't matter since we only need K, pi
+        ktn = Analyze_KTN('/scratch/dk588/databases/modelA',
+                        commdata=f'communities_G1.00_T{temp:.2f}.dat')
+        logpi, Kmat = ktn.read_ktn_info(f'T{temp:.2f}', log=True)
+        pi = np.exp(logpi)
+        pi = pi/pi.sum()
+        minA = np.array([1, 7]) - 1
+        minB = np.array([6, 8]) - 1
+        #first do A<-B
+        cond = np.ones((n,), dtype=bool)
+        cond[minA] = False
+        initial_cond = np.zeros((n,))
+        #initialize probability density to local boltzman in B
+        initial_cond[minB] = pi[minB]/pi[minB].sum()
+        mfptAB = -spla.solve(Kmat[cond, :][:, cond],
+                                initial_cond[cond]).sum()
+        #then do B<-A
+        cond = np.ones((n,), dtype=bool)
+        cond[minB] = False
+        initial_cond = np.zeros((n,))
+        #initialize probability density to local boltzman in A
+        initial_cond[minA] = pi[minA]/pi[minA].sum()
+        mfptBA = -spla.solve(Kmat[cond, :][:, cond],
+                                initial_cond[cond]).sum()
+        data[i,1] = mfptAB
+        data[i,2] = mfptBA
+    df = pd.DataFrame(data, columns=['T', 'MFPTAB', 'MFPTBA'])
+    return df
+
+
 def compute_HS_matrices(temp):
 
     ktn = Analyze_KTN('/scratch/dk588/databases/modelA',
-                      commdata='communities_G1.00_T{temp:.2f}.dat')
+                      commdata=f'communities_G1.00_T{temp:.2f}.dat')
 
     logpi, Kmat = ktn.read_ktn_info(f'T{temp:.2f}')
     Rhs = ktn.construct_coarse_matrix_Hummer_Szabo(temp)
-    Rhs_mfpt = ktn.hummer_szab_from_mfpt(temp)
+    Rhs_mfpt = ktn.hummer_szabo_from_mfpt(temp)
     return
+
+if __name__ == '__main__':
+    #df = pd.read_csv('csvs/rates_LEA_HS_HSK_modelA_MFPT_waitpdf333.csv')
+    #temps = np.unique(df['T'])
+    #df2 = calc_mfpt_AB_tom(temps)
+    temps = [0.075, 0.08, 0.085, 0.09, 0.095, 0.1, 0.105, 0.110, 0.115, 0.120,
+             0.125, 0.130, 0.135, 0.140, 0.145, 0.150, 0.160, 0.165, 0.170,
+             0.175, 0.180, 0.185, 0.190, 0.195, 0.2, 0.25, 0.3, 0.35, 0.4]
+    #start from highest to lowest
+    temps = [0.4, 0.3, 0.2, 0.1, 0.05]
+    temps = temps[::-1]
+    nrgthreshs = [5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 50, 100]
+    nrgthreshs = nrgthreshs[::-1]
+    compare_HS_LEA(temps, nrgthreshs)
+    #temp = 100
+    #ktn = Analyze_KTN('/scratch/dk588/databases/LJ38.2010/4000.minima',
+    #                  thresh=100.0, temp=0.4)
+    #Kmat = ktn.K
+    #pi = ktn.pi
+    #commpi = ktn.commpi
+    #mfpt_comms_GT = ktn.get_MFPT_between_communities_GT(temp)
+    #mfpt_comms_tom = ktn.get_MFPT_between_communities(Kmat, pi)
+    #Rhs = ktn.construct_coarse_matrix_Hummer_Szabo(temp)
+    #Rhs_mfpt = ktn.hummer_szabo_from_mfpt(temp)
+    #Rhs_mfpt_gt = ktn.hummer_szabo_from_mfpt(temp, GT=True)

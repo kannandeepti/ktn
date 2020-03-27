@@ -4,7 +4,7 @@ Workflow:
 - read in initial pathdata file, append / change parameters as desired
 - use a different class to run calculations and name output files
 - use parser class again to then extract output
-- so one ParsedPathsample object per calculation? 
+- so one ParsedPathsample object per calculation?
 
 TODO: potentially parse output separately?
 
@@ -25,7 +25,7 @@ PATHSAMPLE = "/home/dk588/svn/PATHSAMPLE/build/gfortran/PATHSAMPLE"
 disconnectionDPS = "/home/dk588/svn/DISCONNECT/source/disconnectionDPS"
 
 class ParsedPathsample(object):
-    
+
     def __init__(self, pathdata, maxinA=5, maxinB=395, outfile=None):
         self.output = {} #dictionary of output (i.e. temperature, rates)
         self.input = {} #dictionary of PATHSAMPLE keywords
@@ -41,7 +41,7 @@ class ParsedPathsample(object):
         if outfile is not None:
             self.parse_output(outfile)
         self.parse_input(pathdata)
-    
+
     def parse_minA_and_minB(self, minA, minB):
         """Read in the number of minima and the minima IDs in the A and B sets
         from the min.A and min.B files. Note, minima IDs in these files
@@ -76,20 +76,18 @@ class ParsedPathsample(object):
         minA_nrgs = min_nrgs[self.minA]
         sorted_idAs = np.argsort(minA_nrgs)
         self.minA = self.minA[sorted_idAs]
-        print(self.minA)
         minB_nrgs = min_nrgs[self.minB]
         sorted_idBs = np.argsort(minB_nrgs)
         self.minB = self.minB[sorted_idBs]
-        print(self.minB)
         self.write_minA_minB(self.path/'min.A', self.path/'min.B')
 
     def define_A_and_B(self, numInA, numInB, sorted=True, mindata=None):
         """Define an A and B set as a function of the number of minima in A
         and B. """
-        if numInA > self.maxinA:
-            raise ValueError(f'The maximum allowed number of states in A is {self.maxinA}')
-        if numInB > self.maxinB:
-            raise ValueError(f'The maximum allowed number of states in B is {self.maxinB}')
+        #if numInA > self.maxinA:
+        #    raise ValueError(f'The maximum allowed number of states in A is {self.maxinA}')
+        #if numInB > self.maxinB:
+        #    raise ValueError(f'The maximum allowed number of states in B is {self.maxinB}')
         if sorted:
             #min.A and min.B are already sorted by energy
             #just change numInA and numInB
@@ -110,7 +108,7 @@ class ParsedPathsample(object):
         idB = np.argpartition(minB_nrgs, numInB)
         self.minB = self.minB[idB[:numInB]]
         self.numInB = numInB
-        
+
     def write_minA_minB(self, minA, minB):
         """Write a min.A and min.B file based on minIDs
         specified in self.minA and self.minB"""
@@ -167,7 +165,7 @@ class ParsedPathsample(object):
                             '(?:tau\^F_a/P_{Ba} = T_{Ba}, p_a/P_A, '+
                             'weight/T_{Ba}|tau\^F_b/P_{Ab} = T_{Ab}, p_b/P_B, ' +
                             'weight/T_{Ab})=\s+([0-9.E-]+)\s+([0-9.E-]+)\s+([0-9.E-]+)')
-        
+
         dfs = []
         finished = False
         with open(outfile) as f:
@@ -204,7 +202,7 @@ class ParsedPathsample(object):
         TODO: Write out a single-column index file
         `communities.dat` specifying the group to which each minimum in
         min.data belongs."""
-        
+
         communities = {}
         with open(mingroupsfile) as f:
             group = []
@@ -229,7 +227,7 @@ class ParsedPathsample(object):
     def draw_disconnectivity_graph_AB(self, value, temp):
         """Draw a Disconnectivity Graph colored by the minima in A and B after
         running REGROUPFREE at threshold `value` and temperature `temp`."""
-        
+
         #extract group assignments for this temperature/Gthresh
         communities = self.parse_dumpgroups(self.path/f'minima_groups.{temp:.10f}',
                                     grouptomin=True)
@@ -258,7 +256,7 @@ class ParsedPathsample(object):
         #TODO: make sure min.data, ts.data specified.
         #TODO: make sure TRMIN already specified in existing dinfo file
         os.system(f"mv {self.path/'dinfo'} {self.path/'dinfo.original'}")
-        #create a copy of the dinfo file 
+        #create a copy of the dinfo file
         with open(self.path/'dinfo', 'w') as newdinfo:
             with open(self.path/'dinfo.original','r') as ogdinfo:
                 #copy over all lines from previous dinfo file except TRMIN
@@ -279,7 +277,7 @@ class ParsedPathsample(object):
         """Read in a single column file called communities.dat where each line
         is the community ID (zero-indexed) of the minima given by the line
         numbenumber.
-        
+
         Parameters
         ----------
         commdat : .dat file
@@ -345,7 +343,7 @@ class ParsedPathsample(object):
                     #run PATHSAMPLE
                     outfile = open(self.path/f'out.{ci+1}.{cj+1}.T{temp}','w')
                     subprocess.run(f"{PATHSAMPLE}", stdout=outfile,
-                                   cwd=self.patpath)
+                                   cwd=self.path)
                     #parse output
                     self.parse_output(outfile=self.path/f'out.{ci+1}.{cj+1}.T{temp}')
                     MFPT[ci, cj] = 1./self.output['kAB']
@@ -385,7 +383,7 @@ class ParsedPathsample(object):
                         #so will have to re-number min.A,min.B,ts.data
                         newmindata.write(line)
                         j += 1
-                    
+
         #exclude transition states in ts.data that connect minima not in C1/2
         ogtsdata = pd.read_csv(self.path/'ts.data', sep='\s+', header=None,
                                names=['nrg','fvibts','pointgroup','min1','min2','itx','ity','itz'])
@@ -525,7 +523,7 @@ class ScanPathsample(object):
     def dump_rates_full_network(self, temp=None):
         """ Dump rate matrix K_ij from full network as well as stationary
         probabilities p_ij using DUMP_INFOMAP keyword.
-        
+
         Note
         ----
         Make sure that any existing `stat_prob.dat` and `ts_weights.dat` files
@@ -540,7 +538,7 @@ class ScanPathsample(object):
         #remove any unnecessary keywords
         self.parse.comment_input('REGROUPFREE')
         self.parse.comment_input('DUMPGROUPS')
-        self.parse.comment_input('NGT') 
+        self.parse.comment_input('NGT')
         #call dump_infomap to obtain Daniel's files
         self.parse.append_input('DUMPINFOMAP', '')
         if temp is None:
@@ -581,7 +579,7 @@ class ScanPathsample(object):
         # PATHSAMPLE to dump kij rates and pi_i from network
         self.parse.comment_input('REGROUPFREE')
         self.parse.comment_input('DUMPGROUPS')
-        self.parse.comment_input('NGT') 
+        self.parse.comment_input('NGT')
         self.parse.append_input('DUMPINFOMAP', '') #to obtain Daniel's files
         self.parse.write_input(self.pathdatafile)
         outfile = open(self.path/f'out.dumpinfo.LEA.{temp:.2f}','w')
@@ -593,7 +591,7 @@ class ScanPathsample(object):
         tsdata = np.loadtxt(self.path/'ts.data')
         tsdata = tsdata[:,[3,4]].astype('int') #isolating minima ts connects
         np.savetxt(self.path/f'ts_conns_LEA_T{temp:.2f}.dat', tsdata, fmt='%d')
-            
+
         #return files to original names
         for f in files_to_modify:
             os.system(f"mv {f} {f}.regrouped.{temp:.10f}")
@@ -613,7 +611,7 @@ class ScanPathsample(object):
         self.parse.append_input('NGT', '0 T')
         self.parse.write_input(scan.pathdatafile)
         outfile = open(self.path/f'out.NGT.kNGT.{Gthresh:.2f}','w')
-        subprocess.run(f"{PATHSAMPLE}n, stdout=outfile, cwd=self.pathoregroup}")
+        subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
         self.parse.parse_output(outfile=self.path/f'out.NGT.kNGT.{Gthresh:.2f}')
         rates = {}
         rates['kAB'] = self.parse.output['kAB']
@@ -637,7 +635,7 @@ class ScanPathsample(object):
         self.parse.append_input('NGT', '0 T')
         self.parse.write_input(self.pathdatafile)
         outfile = open(self.path/'out.NGT.NOREGROUP','w')
-        subprocess.run(f"{PATHSAMPLE}n, stdout=outfile, cwd=self.pathoregroup}")
+        subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
         self.parse.parse_output(outfile=self.path/'out.NGT.NOREGROUP')
         rates = {}
         rates['kAB'] = self.parse.output['kAB']
@@ -666,7 +664,7 @@ class ScanPathsample(object):
             self.parse.append_input('NGT', '0 T')
         #overwrite pathdata file with updated input
         self.parse.write_input(self.pathdatafile)
-        #run calculation 
+        #run calculation
         outfile = open(self.path/f'{self.outbase}.REGROUPFREE.{value:.2f}','w')
         subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
         #parse output
@@ -717,9 +715,9 @@ class ScanPathsample(object):
             if not dir_name.is_dir():
                 dir_name.mkdir()
             os.system(f'mv {f} {dir_name}/{f.name}.G{value:.1f}')
-        print(f"Computed rate constants for regrouped minima with threshold {value}") 
+        print(f"Computed rate constants for regrouped minima with threshold {value}")
         return df
-    
+
     def scan_regroup(self, name, values, temp, NGTpostregroup=False):
         """Re-run PATHSAMPLE calculations for different `values` of the
         REGROUPFREE threshold. Extract output defined by outputkey and run NGT
@@ -740,7 +738,7 @@ class ScanPathsample(object):
             bigdf = olddf.append(bigdf)
         #write updated file to csv
         bigdf.to_csv(csv, index=False)
-    
+
     def scan_temp(self, name, values):
         """Re-run PATHSAMPLE at different temperatures specified by values and
         extract kNSSAB and kNSSBA from the NGT keyword output."""
@@ -753,7 +751,7 @@ class ScanPathsample(object):
             self.parse.append_input(name, value)
             #overwrite pathdata file with updated input
             self.parse.write_input(self.pathdatafile)
-            #run calculation 
+            #run calculation
             outfile = open(self.path/f'{self.outbase}.{name}.{value:.2f}','w')
             subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
             #parse output
@@ -768,7 +766,7 @@ class ScanPathsample(object):
             df['kBA'] = [self.parse.output['kBA']]
             df['T'] = [value]
             dfs.append(df)
-            print(f"Computed rate constants for temperature {value}") 
+            print(f"Computed rate constants for temperature {value}")
         bigdf = pd.concat(dfs, ignore_index=True, sort=False)
         bigdf['numInA'] = self.parse.numInA
         bigdf['numInB'] = self.parse.numInB
@@ -782,8 +780,8 @@ class ScanPathsample(object):
     def remove_output(self):
         """Delete PATHSAMPLE log files."""
         for f in glob.glob(str(self.path/'out*')):
-            if Path(f).exists():	
-                Path(f).unlink() 
+            if Path(f).exists():
+                Path(f).unlink()
 
 """ Functions for using the ScanPathsample and ParseSample classes to perform
 useful tasks. """
