@@ -63,6 +63,16 @@ plt.rcParams.update(waitpdf_params)
 #fm = font_manager.json_load(os.path.expanduser("~/.cache/matplotlib/fontList.json"))
 #fm.findfont('serif', rebuild_if_missing=True)
 
+def dump_gephi_format(mindata, tsdata):
+    """Create gephi-style csv format files from a min.data and ts.data file."""
+    mindata = np.loadtxt(mindata)
+    tsdata = np.loadtxt(tsdata)
+    edge_df = pd.DataFrame(columns=['min1', 'min2'])
+    edge_df['min1'] = tsdata[:, 3].astype('int')
+    edge_df['min2'] = tsdata[:, 4].astype('int')
+    edge_df.to_csv('csvs/gephi_edge_connections.csv')
+
+
 def plot_kAB_Gthresh(temp, direction='AB'):
     """plot kSSAB, kNGTAB as a function of Gthresh, and the exact kNGT
     for two different definitions of products and reactants.
