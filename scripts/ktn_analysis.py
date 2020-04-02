@@ -828,6 +828,33 @@ def compare_HS_LEA(temps, nrgthreshs):
                 continue
 
             for i, R in enumerate(matrices):
+                """ get A->B and B->A mfpt on coarse network"""
+                ABparse = ParsedPathsample(ktn.path/'pathdata')
+                ABparse.parse_minA_and_minB(ktn.path/f'G{thresh:.1f}/min.A.regrouped.{temp:.10f}.G{thresh:.1f}',
+                                ktn.path/f'G{thresh:.1f}/min.B.regrouped.{temp:.10f}.G{thresh:.1f}')
+
+                #first do A<-B
+                N = len(ktn.communities)
+                pi = ktn.commpi
+                cond = np.ones((N,), dtype=bool)
+                cond[ABparse.minA] = False
+                initial_cond = np.zeros((N,))
+                #initialize probability density to local boltzman in B
+                initial_cond[ABparse.minB] = pi[ABparse.minB]/pi[ABparse.minB].sum()
+                mfptAB = -spla.solve(R[cond, :][:, cond],
+                                        initial_cond[cond]).sum()
+                #then do B<-A
+                cond = np.ones((N,), dtype=bool)
+                cond[ABparse.minB] = False
+                initial_cond = np.zeros((N,))
+                #initialize probability density to local boltzman in A
+                initial_cond[ABparse.minA] = pi[ABparse.minA]/pi[ABparse.minA].sum()
+                mfptBA = -spla.solve(R[cond, :][:, cond],
+                                        initial_cond[cond]).sum()
+
+                df[f'MFPTAB_{labels[i]}'] = [mfptAB]
+                df[f'MFPTBA_{labels[i]}'] = [mfptBA]
+                """
                 try:
                     ktn.get_free_energies_from_rates(R, thresh, temp)
                 except ValueError as e:
@@ -862,7 +889,6 @@ def compare_HS_LEA(temps, nrgthreshs):
                 df[f'MFPTBA_{labels[i]}'] = [parse.output['MFPTBA']]
                 #now run waitpdf on the coarse network
                 parse.comment_input('NGT')
-                """
                 parse.append_input('WAITPDF', '')
                 parse.write_input(ktn.path/'pathdata')
                 outfile = open(parse.path/f'out.{thresh:.1f}.T{temp:.1f}.waitpdf','w')
@@ -886,23 +912,23 @@ def compare_HS_LEA(temps, nrgthreshs):
                 else:
                     #df[f'k*BA_{labels[i]}'] = np.nan
                     df[f'tau*BA_{labels[i]}'] = np.nan
-                """
                 #return original min.data / ts.data files
                 for j, f in enumerate(og_input_files):
                     os.system(f'mv {f}.original {f}')
+                """
             dfs.append(df)
         bigdf = pd.concat(dfs, ignore_index=True, sort=False)
         scan = ScanPathsample(ktn.path/'pathdata', suffix='scan_MFPT_exact')
         #scan.parse.comment_input('WAITPDF')
-        rates = scan.run_NGT_exact()
+        rates = scan.run_NGT_exact(temp)
         bigdf['MFPTexactAB'] = rates['MFPTAB']
         bigdf['MFPTexactBA'] = rates['MFPTBA']
-        bigdf['kABexact'] = rates['kAB']
-        bigdf['kBAexact'] = rates['kBA']
+        #bigdf['kABexact'] = rates['kAB']
+        #bigdf['kBAexact'] = rates['kBA']
         bigdfs.append(bigdf)
     biggerdf = pd.concat(bigdfs, ignore_index=True)
     #if file exists, append to existing data
-    csv = Path('csvs/rates_LEA_HS_HSK_LJ38_MFPT.csv')
+    csv = Path('csvs/rates_LEA_HSK_LJ38_MFPT.csv')
     #if csv.is_file():
     #    olddf = pd.read_csv(csv)
     #    bigdf = olddf.append(bigdf)
@@ -962,15 +988,15 @@ if __name__ == '__main__':
     #df = pd.read_csv('csvs/rates_LEA_HS_HSK_modelA_MFPT_waitpdf333.csv')
     #temps = np.unique(df['T'])
     #df2 = calc_mfpt_AB_tom(temps)
-    temps = [0.075, 0.08, 0.085, 0.09, 0.095, 0.1, 0.105, 0.110, 0.115, 0.120,
-             0.125, 0.130, 0.135, 0.140, 0.145, 0.150, 0.160, 0.165, 0.170,
-             0.175, 0.180, 0.185, 0.190, 0.195, 0.2, 0.25, 0.3, 0.35, 0.4]
+    #temps = [0.075, 0.08, 0.085, 0.09, 0.095, 0.1, 0.105, 0.110, 0.115, 0.120,
+    #         0.125, 0.130, 0.135, 0.140, 0.145, 0.150, 0.160, 0.165, 0.170,
+    #         0.175, 0.180, 0.185, 0.190, 0.195, 0.2, 0.25, 0.3, 0.35, 0.4]
     #start from highest to lowest
-    temps = [0.4, 0.3, 0.2, 0.1, 0.05]
-    temps = temps[::-1]
-    nrgthreshs = [5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 50, 100]
-    nrgthreshs = nrgthreshs[::-1]
-    compare_HS_LEA(temps, nrgthreshs)
+    #temps = [0.4, 0.3, 0.2, 0.1, 0.05]
+    #temps = temps[::-1]
+    #nrgthreshs = [5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 50, 100]
+    #nrgthreshs = nrgthreshs[::-1]
+    #compare_HS_LEA(temps, nrgthreshs)
     #temp = 100
     #ktn = Analyze_KTN('/scratch/dk588/databases/LJ38.2010/4000.minima',
     #                  thresh=100.0, temp=0.4)
@@ -982,3 +1008,7 @@ if __name__ == '__main__':
     #Rhs = ktn.construct_coarse_matrix_Hummer_Szabo(temp)
     #Rhs_mfpt = ktn.hummer_szabo_from_mfpt(temp)
     #Rhs_mfpt_gt = ktn.hummer_szabo_from_mfpt(temp, GT=True)
+    
+    temps = [100.0, 90.0, 80.0, 70.0, 60.0, 50.0, 40.0, 30.0, 
+           20.0, 10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 
+           1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]

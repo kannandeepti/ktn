@@ -628,11 +628,12 @@ class ScanPathsample(object):
             os.system(f"mv {f}.original {f}")
         return rates
 
-    def run_NGT_exact(self):
+    def run_NGT_exact(self, temp):
         #compare to exact kNSS calculation without free energy regrouping
         self.parse.comment_input('REGROUPFREE')
         self.parse.comment_input('DUMPGROUPS')
         self.parse.append_input('NGT', '0 T')
+        self.parse.append_input('TEMPERATURE', temp)
         self.parse.write_input(self.pathdatafile)
         outfile = open(self.path/'out.NGT.NOREGROUP','w')
         subprocess.run(f"{PATHSAMPLE}", stdout=outfile, cwd=self.path)
@@ -835,19 +836,26 @@ def scan_Gthresh_and_temp(temps, nrgthreshs):
     #write updated file to csv
     olddf.to_csv('csvs/rates_Gthresh_temp_scan4.csv')
 
-def dump_ktn_info_scan(temps, nrgthreshs):
+def dump_ktn_info_scan(path, temps, nrgthreshs=None):
     """Dumpt all .dat files based on temp/Gthresh scan."""
-    scan = ScanPathsample('./pathdata')
+    scan = ScanPathsample(Path(path)/'pathdata')
     for temp in temps:
         scan.dump_rates_full_network(temp)
-        for thresh in nrgthreshs:
-            communities = scan.parse.parse_dumpgroups(scan.path/f'G{thresh:.1f}/minima_groups.{temp:.10f}.G{thresh:.1f}')
-            scan.parse.write_communities(communities,
-                                         scan.path/f'communities_G{thresh:.2f}_T{temp:.2f}.dat')
+        if nrgthreshs is None:
+            continue
+        else:
+            for thresh in nrgthreshs:
+                communities = scan.parse.parse_dumpgroups(scan.path/f'G{thresh:.1f}/minima_groups.{temp:.10f}.G{thresh:.1f}')
+                scan.parse.write_communities(communities,
+                                            scan.path/f'communities_G{thresh:.2f}_T{temp:.2f}.dat')
 
 if __name__=='__main__':
     #temps = np.arange(0.03, 0.16, 0.01)
     temps = np.arange(0.03, 1.01, 0.01)
+    temps = [100.0, 90.0, 80.0, 70.0, 60.0, 50.0, 40.0, 30.0, 
+           20.0, 10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 
+           1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]
+    dump_ktn_info_scan('/scratch/dk588/databases/chain/metastable', temps)
     #numinBs = np.arange(1, 396, 1)
     #numinAs = np.tile(1, len(numinBs))
     #parse.sort_A_and_B(parse.path/'min.A.master',parse.path/'min.B.master', parse.path/'min.data')
