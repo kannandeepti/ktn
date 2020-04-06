@@ -4,6 +4,7 @@ calculations on the unbranched nearest neighbor model first considered in Weiss
 
 Deepti Kannan 2020 """
 
+from code_wrapper import ParsedPathsample
 from ktn_analysis import Analyze_KTN
 import numpy as np
 from numpy.linalg import inv
@@ -54,7 +55,9 @@ plot_params = {'axes.edgecolor': 'black',
                   'ytick.minor.right':False, 
                   'lines.linewidth':1}
 plt.rcParams.update(plot_params)
-path = Path('/Users/deepti/Documents/Wales/databases/chain/metastable')
+#path = Path('/Users/deepti/Documents/Wales/databases/chain/metastable')
+path = Path('/scratch/dk588/databases/chain/metastable')
+PATHSAMPLE = "/home/dk588/svn/PATHSAMPLE/build/gfortran/PATHSAMPLE"
 
 """Define variables needed to calculate rate as a function of
 temperature."""
@@ -156,16 +159,76 @@ def mfpt_from_correlation(temp):
     pioneK = spla.inv(pi.reshape((nmin,1))@np.ones((1,nmin)) + K)
     zvec = np.diag(pioneK)
     mfpt = np.diag(1./pi)@(pioneK - zvec.reshape((nmin,1))@np.ones((1,nmin)))
+    return mfpt
+
+def mfpt_between_states_GT_eigen(i, j, temps):
+    """Calculate the i <-> j passage times using graph transformation and the
+    WAITPDF keyword in the PATHSAMPLE program."""
+
+    parse = ParsedPathsample(path/'pathdata')
+    files_to_modify = [path/'min.A', path/'min.B']
+    for f in files_to_modify:
+        if not f.exists():
+            print(f'File {f} does not exists')
+            raise FileNotFoundError 
+        os.system(f'mv {f} {f}.original')
     
-    negpioneK = spla.inv(pi.reshape((nmin,1))@np.ones((1,nmin)) - K)
-    zvec = np.diag(negpioneK)
-    mfpt2 = np.diag(1./pi)@(zvec.reshape((nmin,1))@np.ones((1,nmin)) - negpioneK)
-    return mfpt2
+    dfs = []
+    for temp in temps:
+        df = pd.DataFrame()
+        df['T'] = [temp]
+        #first get t( i<->j) from GT
+        parse.append_input('NGT', '0 T')
+        parse.comment_input('WAITPDF')
+        parse.append_input('TEMPERATURE', f'{temp}')
+        parse.write_input(path/'pathdata')
+        parse.minA = [i] 
+        parse.numInA = 1
+        parse.minB = [j]
+        parse.numInB = 1
+        parse.write_minA_minB(path/'min.A', path/'min.B')
+        #run PATHSAMPLE
+        outfile_name = path/f'out.{i+1}.{j+1}.T{temp}'
+        outfile = open(outfile_name, 'w')
+        subprocess.run(f"{PATHSAMPLE}", stderr=subprocess.STDOUT, stdout=outfile, cwd=path)
+        #parse output
+        parse.parse_output(outfile=path/f'out.{i+1}.{j+1}.T{temp}')
+        df[f'tGT{i}{j}'] = [parse.output['MFPTAB']]
+        df[f'tGT{j}{i}'] = [parse.output['MFPTBA']]
+
+        #then re-run PATHSAMPLE to get t*(i<->j) with eigendecomposition
+        parse.comment_input('NGT')
+        parse.append_input('WAITPDF', '')
+        parse.write_input(path/'pathdata')
+        outfile = open(parse.path/f'out.T{temp:.1f}.waitpdf','w')
+        try:
+            subprocess.run(f"{PATHSAMPLE}", stderr=subprocess.STDOUT,
+                            stdout=outfile, cwd=path, timeout=5)
+        except subprocess.TimeoutExpired:
+            print('WAITPDF expired 5s timeout. Setting tau*AB and' +
+                    ' tau*BA to NaN')
+        #parse output
+        parse.parse_output(outfile=parse.path/f'out.T{temp:.1f}.waitpdf')
+        if 'tau*AB' in parse.output:
+            df[f't*{i}{j}'] = [parse.output['tau*AB']]
+        else:
+            df[f't*{i}{j}'] = np.nan
+        if 'tau*BA' in parse.output:
+            df[f't*{j}{i}'] = [parse.output['tau*BA']]
+        else:
+            df[f't*{j}{i}'] = np.nan
+        dfs.append(df)
+    bigdf = pd.concat(dfs, ignore_index=True, sort=False)
+    bigdf.to_csv(f'csvs/weiss_GT_eigendecomposition_mfpt{i}{j}.csv')
+    #restore original min.A and min.B files
+    for f in files_to_modify:
+        os.system(f'mv {f}.original {f}')
+
 
 def compare_weiss_pt(i, j, I, J):
     """Plot PTAB vs. weiss[min1, min2] to compare, where min1 is a minimum in A
     and min2 is a minimum in B."""
-    comm = {0:'A', 1:'I', 2:'J'}
+    comm = {0:'A', 1:'I', 2:'B'}
     ktn = Analyze_KTN('/scratch/dk588/databases/chain/metastable', communities
                       = {1:[1,2,3], 2:[4,5,6,7,8], 3:[9,10,11]})
     invT = np.linspace(0.001, 5, 100)
@@ -184,8 +247,8 @@ def compare_weiss_pt(i, j, I, J):
         PTBA[k] = pt[J,I]
 
     fig, ax = plt.subplots(figsize=[textwidth_inches/3, textwidth_inches/3])
-    ax.plot(invT, weissAB/PTAB, label=f't({i}<-{j})/PT({comm[I]}<-{comm[J]})')
-    ax.plot(invT, weissBA/PTBA, label=f't({j}<-{i})/PT({comm[J]}<-{comm[I]})')
+    ax.plot(invT, weissAB/PTAB, label=f't({i}{j})/PT({comm[I]}{comm[J]})')
+    ax.plot(invT, weissBA/PTBA, label=f't({j}{i})/PT({comm[J]}{comm[I]})')
     plt.xlabel('1/T')
     plt.legend()
     fig.tight_layout()
@@ -312,3 +375,7 @@ def plot_mfpt_benchmark():
     ax.set_yscale('log')
     ax.legend()
     plt.subplots_adjust(left=0.05, right=0.99, top=0.99, bottom=0.11)
+
+if __name__ == "__main__":
+    temps = 1./np.linspace(0.01, 43, 30)
+    mfpt_between_states_GT_eigen(1, 9, temps)
