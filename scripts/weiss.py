@@ -264,7 +264,7 @@ def plot_weiss_landscape_mfpt_benchmark():
     xrange = np.linspace(1, 11, 1000)
     cs = CubicSpline(states, stat_pts, bc_type='clamped')
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=[textwidth_inches,
-                                                 textwidth_inches/2])
+                                                 textwidth_inches*(3.2/7)])
     ax.plot(xrange, cs(xrange), 'k')
     ax.plot(states[0:5:2], stat_pts[0:5:2], 'ro')
     ax.plot(states[6:16:2], stat_pts[6:16:2], 'ko')
@@ -278,66 +278,14 @@ def plot_weiss_landscape_mfpt_benchmark():
 
     ktn = Analyze_KTN('/scratch/dk588/databases/chain/metastable', communities
                       = {1:[1,2,3], 2:[4,5,6,7,8], 3:[9,10,11]})
-    invT = np.linspace(0.001, 10/3, 10000)
-    temps = np.array([100.0, 90.0, 80.0, 70.0, 60.0, 50.0, 40.0, 30.0, 
-           20.0, 10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 
-           1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3])
-    weissAB = np.zeros_like(invT)
+    invT = np.linspace(0.01, 43, 1000)
     weissBA = np.zeros_like(invT)
-    gtAB = np.zeros_like(temps)
-    gtBA = np.zeros_like(temps)
-    eigenAB = np.zeros_like(temps)
-    eigenBA = np.zeros_like(temps)
-    corrAB = np.zeros_like(temps)
-    corrBA = np.zeros_like(temps)
-    n=11
-    i=1
-    j=9
-    for k, invtemp in enumerate(invT):
-        mfpt_weiss = weiss(1./invtemp)
-        weissAB[k] = mfpt_weiss[i, j]
-        weissBA[k] = mfpt_weiss[j, i]
-
-    for k, T in enumerate(temps):
-        mfpt_corr = mfpt_from_correlation(T)
-        corrAB[k] = mfpt_corr[i, j]
-        corrBA[k] = mfpt_corr[j, i]
-        K = Kmat(T)
-        eigenAB[k] = -spla.solve(K[np.arange(n)!=i, :][:, np.arange(n)!=i],
-                                (np.arange(n)==j)[np.arange(n)!=i]).sum()
-        eigenBA[k] = -spla.solve(K[np.arange(n)!=j, :][:, np.arange(n)!=j],
-                                (np.arange(n)==i)[np.arange(n)!=j]).sum()
-
-    ax2.plot(invT, weissAB, 'k', label='Weiss')
-    ax2.plot(1./temps, eigenAB, 'o', markersize=11, alpha=0.3,
-             markeredgewidth=0, label='Eigendecomposition')
-    ax2.plot(1./temps, corrAB, 'ro', markersize=5, markeredgewidth=0.25,
-             markeredgecolor='k', label='Correlation function')
-    ax2.plot(1./temps, eigenAB, 'kx', markersize=7, 
-            label='GT')
-    ax2.set_xlabel('1/T')
-    ax2.set_ylabel('$t_{2 \leftarrow 10}$')
-    ax2.set_yscale('log')
-    ax2.legend()
-    plt.subplots_adjust(left=0.05, right=0.99, top=0.99, bottom=0.11)
-
-def plot_mfpt_benchmark():
-
-    """ Plot 4 different calculations of mfpt: weiss analytical answer,
-    eigendecomposition, GT, Kells inversion. """
-
-    ktn = Analyze_KTN('/scratch/dk588/databases/chain/metastable', communities
-                      = {1:[1,2,3], 2:[4,5,6,7,8], 3:[9,10,11]})
-    invT = np.linspace(5, 43, 1000)
-    temps = 1./np.linspace(5, 43, 30)
     weissAB = np.zeros_like(invT)
-    weissBA = np.zeros_like(invT)
-    #gtAB = np.zeros_like(temps)
-    #gtBA = np.zeros_like(temps)
-    eigenAB = np.zeros_like(temps)
-    eigenBA = np.zeros_like(temps)
-    corrAB = np.zeros_like(temps)
+    df = pd.read_csv('csvs/weiss_GT_eigendecomposition_mfpt19.csv')
+    df = df.drop(columns=['Unnamed: 0'])
+    temps = df['T']
     corrBA = np.zeros_like(temps)
+    corrAB = np.zeros_like(temps)
     n=11
     i=1
     j=9
@@ -352,8 +300,8 @@ def plot_mfpt_benchmark():
             corrAB[k] = mfpt_corr[i, j]
             corrBA[k] = mfpt_corr[j, i]
         except:
-            corrAB[k] = np.nan
             corrBA[k] = np.nan
+        """
         try:
             K = Kmat(T)
             eigenAB[k] = -spla.solve(K[np.arange(n)!=i, :][:, np.arange(n)!=i],
@@ -363,19 +311,73 @@ def plot_mfpt_benchmark():
         except:
             eigenAB[k] = np.nan
             eigenBA[k] = np.nan
+        """
 
+    #10 <- 2 direction (BA)
+    ax2.plot(invT, weissBA, 'k', label='Weiss')
+    ax2.plot(1./temps, df['t*91'], 'o', markersize=11, alpha=0.3,
+            markeredgewidth=0, label='Eigendecomposition')
+    ax2.plot(1./temps, corrBA, 'bo', markersize=5, markeredgewidth=0.25,
+            markeredgecolor='k', label='Correlation function')
+    ax2.plot(1./temps, df['tGT91'], 'kx', markersize=3, label='GT')
+    ax2.set_xlabel('1/T')
+    ax2.set_ylabel('$t_{10 \leftarrow 2}$')
+    ax2.set_yscale('log')
+    ax2.legend()
+    #plt.subplots_adjust(left=0.06, bottom=0.13, top=0.97, right=0.99)
+    fig.tight_layout()
+
+def plot_mfpt_benchmark():
+
+    """ Plot 4 different calculations of mfpt: weiss analytical answer,
+    eigendecomposition, GT, Kells inversion. """
+
+    ktn = Analyze_KTN('/scratch/dk588/databases/chain/metastable', communities
+                      = {1:[1,2,3], 2:[4,5,6,7,8], 3:[9,10,11]})
+    invT = np.linspace(0.01, 43, 1000)
+    weissBA = np.zeros_like(invT)
+    weissAB = np.zeros_like(invT)
+    df = pd.read_csv('csvs/weiss_GT_eigendecomposition_mfpt19.csv')
+    df = df.drop(columns=['Unnamed: 0'])
+    temps = df['T']
+    corrBA = np.zeros_like(temps)
+    corrAB = np.zeros_like(temps)
+    n=11
+    i=1
+    j=9
+    for k, invtemp in enumerate(invT):
+        mfpt_weiss = weiss(1./invtemp)
+        weissAB[k] = mfpt_weiss[i, j]
+        weissBA[k] = mfpt_weiss[j, i]
+
+    for k, T in enumerate(temps):
+        try:
+            mfpt_corr = mfpt_from_correlation(T)
+            corrAB[k] = mfpt_corr[i, j]
+            corrBA[k] = mfpt_corr[j, i]
+        except:
+            corrBA[k] = np.nan
+        """
+        try:
+            K = Kmat(T)
+            eigenAB[k] = -spla.solve(K[np.arange(n)!=i, :][:, np.arange(n)!=i],
+                                    (np.arange(n)==j)[np.arange(n)!=i]).sum()
+            eigenBA[k] = -spla.solve(K[np.arange(n)!=j, :][:, np.arange(n)!=j],
+                                    (np.arange(n)==i)[np.arange(n)!=j]).sum()
+        except:
+            eigenAB[k] = np.nan
+            eigenBA[k] = np.nan
+        """
+
+    #2 <- 10 direction (AB)
     fig, ax = plt.subplots(figsize=[textwidth_inches/2, textwidth_inches/3])
     ax.plot(invT, weissAB, 'k', label='Weiss')
-    ax.plot(1./temps, eigenAB, 'o', markersize=11, alpha=0.3,
+    ax.plot(1./temps, df['t*19'], 'o', markersize=11, alpha=0.3,
             markeredgewidth=0, label='Eigendecomposition')
     ax.plot(1./temps, corrAB, 'bo', markersize=5, markeredgewidth=0.25,
             markeredgecolor='k', label='Correlation function')
+    ax.plot(1./temps, df['tGT19'], 'kx', markersize=6, label='GT')
     ax.set_xlabel('1/T')
     ax.set_ylabel('$t_{2 \leftarrow 10}$')
     ax.set_yscale('log')
     ax.legend()
-    plt.subplots_adjust(left=0.05, right=0.99, top=0.99, bottom=0.11)
-
-if __name__ == "__main__":
-    temps = 1./np.linspace(0.01, 43, 30)
-    mfpt_between_states_GT_eigen(1, 9, temps)
