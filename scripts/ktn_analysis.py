@@ -24,7 +24,153 @@ import subprocess
 
 PATHSAMPLE = "/home/dk588/svn/PATHSAMPLE/build/gfortran/PATHSAMPLE"
 
+"""Functions to analyze KTNs without any community structure."""
+
+def read_ktn_info(self, suffix, log=False):
+    #read in Daniel's files stat_prob.dat and ts_weights.dat
+    logpi = np.loadtxt(self.path/f'stat_prob_{suffix}.dat')
+    pi = np.exp(logpi)
+    nnodes = len(pi)
+    assert(abs(1.0 - np.sum(pi)) < 1.E-10)
+    logk = np.loadtxt(self.path/f'ts_weights_{suffix}.dat', 'float')
+    k = np.exp(logk)
+    tsconns = np.loadtxt(self.path/f'ts_conns_{suffix}.dat', 'int')
+    Kmat = np.zeros((nnodes, nnodes))
+    for i in range(tsconns.shape[0]):
+        Kmat[tsconns[i,1]-1, tsconns[i,0]-1] = k[2*i]
+        Kmat[tsconns[i,0]-1, tsconns[i,1]-1] = k[2*i+1]
+    #set diagonals
+    for i in range(nnodes):
+        Kmat[i, i] = 0.0
+        Kmat[i, i] = -np.sum(Kmat[:, i])
+    #identify isolated minima (where row of Kmat = 0)
+    #TODO: identify unconnected minima
+    Kmat_nonzero_rows = np.where(~np.all(Kmat==0, axis=1))
+    Kmat_connected = Kmat[np.ix_(Kmat_nonzero_rows[0],
+                                    Kmat_nonzero_rows[0])]
+    pi = pi[Kmat_nonzero_rows]/np.sum(pi[Kmat_nonzero_rows])
+    logpi = np.log(pi)
+    assert(len(pi) == Kmat_connected.shape[0])
+    assert(Kmat_connected.shape[0] == Kmat_connected.shape[1])
+    assert(np.all(np.abs(Kmat_connected@pi)<1.E-10))
+
+    if log:
+        return logpi, Kmat_connected 
+    else:
+        return pi, Kmat_connected
+
+def calc_eigenvectors(K, k, which_eig='SM', norm=False):
+    # calculate k dominant eigenvectors and eigenvalues of sparse matrix
+    # using the implictly restarted Arnoldi method
+    evals, evecs = eigs(K, k, which=which_eig)
+    evecs = np.transpose(evecs)
+    evecs = np.array([evec for _,evec in sorted(zip(list(evals),list(evecs)),
+                                key=lambda pair: pair[0], reverse=True)],dtype=float)
+    evals = np.array(sorted(list(evals),reverse=True),dtype=float)
+    if norm:
+        row_sums = evecs.sum(axis=1)
+        evecs = evecs / row_sums[:, np.newaxis] 
+    return evals, evecs
+
+def construct_transition_matrix(K, tau_lag):
+    """ Return column-stochastic transition matrix T = expm(K*tau).
+    Columns sum to 1. """
+    T = expm(tau_lag*K)
+    for x in np.sum(T, axis=0):
+        #assert( abs(x - 1.0) < 1.0E-10) 
+        print(f'Transition matrix is not column-stochastic at' \
+                f'tau={tau_lag}')
+    return T
+
+def get_timescales(K, m, tau_lag):
+    """ Return characteristic timescales obtained from the m dominant 
+    eigenvalues of the transition matrix constructed from K at lag time
+    tau_lag."""
+    T = construct_transition_matrix(K, tau_lag)
+    evals, evecs = calc_eigenvectors(T, m, which_eig='LM')
+    char_times = np.zeros((np.shape(evals)[0]),dtype=float)
+    # note that we ignore the zero eigenvalue, associated with
+    # infinite time (stationary distribution)
+    for i, eigval in enumerate(evals[1:]):
+        char_times[i+1] = -tau_lag/np.log(eigval)
+    return char_times
+
+def calculate_spectral_error(m, Rs, labels):
+    """ Calculate spectral error, where m is the number of dominant
+    eigenvalues in both the reduced and original transition networks, as a
+    function of lag time. Plots the decay. """
+
+    tau_lags = np.logspace(-4, 4, 1000)
+    colors = sns.color_palette("BrBG", 5)
+    colors = [colors[0], colors[-1]]
+    fig, ax = plt.subplots()
+
+    for j,R in enumerate(Rs):
+        spectral_errors = np.zeros(tau_lags.shape)
+        for i, tau in enumerate(tau_lags):
+            T = construct_transition_matrix(R, tau)
+            Tevals, Tevecs = calc_eigenvectors(T, m+1, which_eig='LM')
+            # compare m+1 th eigenvalue (first fast eigenvalue) to slowest
+            # eigenmodde
+            spectral_errors[i] = Tevals[m]/Tevals[1]
+        ax.plot(tau_lags, spectral_errors, label=labels[j], color=colors[j])
+
+    plt.xlabel(r'$\tau$')
+    plt.ylabel(r'$\eta(\tau)$')
+    plt.yscale('log')
+    plt.legend()
+    fig.tight_layout()
+
+def check_detailed_balance(pi, K):
+    """ Check if network satisfies detailed balance condition, which is
+    thatthat :math:`k_{ij} \pi_j = k_{ji} \pi_i` for all :math:`i,j`.
+
+    Parameters
+    ----------
+    pi : list (nnodes,) or (ncomms,)
+        stationary probabilities
+    K : np.ndarray (nnodes, nnodes) or (ncomms, ncomms)
+        inter-minima rate constants in matrix form
+
+    """
+    for i in range(K.shape[0]):
+        for j in range(K.shape[1]):
+            if i < j:
+                left = K[i,j]*pi[j]
+                right = K[j,i]*pi[i]
+                diff = abs(left - right)
+                if (diff > 1.E-10):
+                    #print(f'Detailed balance not satisfied for i={i}, j={j}')
+                    return False
+
+def read_communities(commdat):
+    """Read in a single column file called communities.dat where each line
+    is the community ID (zero-indexed) of the minima given by the line
+    number.
+    
+    Parameters
+    ----------
+    commdat : .dat file
+        single-column file containing community IDs of each minimum
+
+    Returns
+    -------
+    communities : dict
+        mapping from community ID (1-indexed) to minima ID (1-indexed)
+    """
+
+    communities = {}
+    with open(commdat, 'r') as f:
+        for minID, line in enumerate(f, 1):
+            groupID =  int(line) + 1
+            if groupID in communities:
+                communities[groupID].append(minID)
+            else:
+                communities[groupID] = [minID]
+    return communities
+
 class Analyze_KTN(object):
+    """ Analyze a KTN with a specified community structure."""
 
     def __init__(self, path, communities=None,
                  commdata=None, temp=None, thresh=None, pathsample=None):
@@ -35,12 +181,12 @@ class Analyze_KTN(object):
         if communities is not None:
             self.communities = communities
         elif commdata is not None:
-            self.communities = self.read_communities(self.path/commdata)
+            self.communities = read_communities(self.path/commdata)
         else:
             if thresh is not None and temp is not None:
                 commdata=f'communities_G{thresh:.2f}_T{temp:.3f}.dat'
-                self.communities = self.read_communities(self.path/commdata)
-                logpi, Kmat = self.read_ktn_info(f'T{temp:.3f}', log=True)
+                self.communities = read_communities(self.path/commdata)
+                logpi, Kmat = read_ktn_info(f'T{temp:.3f}', log=True)
                 pi = np.exp(logpi)
                 self.K = Kmat
                 self.pi = pi/pi.sum()
@@ -166,7 +312,7 @@ class Analyze_KTN(object):
         equilibrium approximation (LEA)."""
 
         if self.K is None:
-            logpi, Kmat = self.read_ktn_info(f'T{temp:.3f}', log=True)
+            logpi, Kmat = read_ktn_info(f'T{temp:.3f}', log=True)
             pi = np.exp(logpi)
             self.K = Kmat
             self.pi = pi/pi.sum()
@@ -192,7 +338,7 @@ class Analyze_KTN(object):
         relation, aka eqn. (12) in Hummer & Szabo (2015) J.Phys.Chem.B."""
 
         if self.K is None:
-            logpi, Kmat = self.read_ktn_info(f'T{temp:.3f}', log=True)
+            logpi, Kmat = read_ktn_info(f'T{temp:.3f}', log=True)
             pi = np.exp(logpi)
             self.K = Kmat
             self.pi = pi/pi.sum()
@@ -222,7 +368,7 @@ class Analyze_KTN(object):
         #H-S relation
         second_inversion = spla.inv(M.T@first_inverse@D_V@M)
         R_HS = Pi_col@np.ones((1,N)) - D_N@second_inversion
-        if not self.check_detailed_balance(np.log(self.commpi), R_HS):
+        if not check_detailed_balance(np.log(self.commpi), R_HS):
             print(f'HS does not satisfy detailed balance at T={temp}')
         return R_HS
 
@@ -231,7 +377,7 @@ class Analyze_KTN(object):
         of Kells et al. (2019) paper on correlation functions and the Kemeny
         constant."""
         if self.K is None:
-            logpi, Kmat = self.read_ktn_info(f'T{temp:.3f}', log=True)
+            logpi, Kmat = read_ktn_info(f'T{temp:.3f}', log=True)
             pi = np.exp(logpi)
             self.K = Kmat
             self.pi = pi/pi.sum()
@@ -259,7 +405,7 @@ class Analyze_KTN(object):
         R = Pi_col@np.ones((1,N)) - D_N@spla.inv(Pi_col@Pi_col.T +
                                                  M.T@D_n@mfpt@pi_col@Pi_col.T -
                                                  M.T@D_n@mfpt@D_n@M)
-        if not self.check_detailed_balance(np.log(self.commpi), R):
+        if not check_detailed_balance(np.log(self.commpi), R):
             print(f'KRA does not satisfy detailed balance at T={temp}')
         return R
 
@@ -329,8 +475,8 @@ class Analyze_KTN(object):
                     parse.minB = np.array(communities[cj+1]) - 1
                     parse.numInB = len(communities[cj+1])
                     parse.write_minA_minB(self.path/'min.A', self.path/'min.B')
-                    os.system(f'cat {self.path}/min.A')
-                    os.system(f'cat {self.path}/min.B')
+                    #os.system(f'cat {self.path}/min.A')
+                    #os.system(f'cat {self.path}/min.B')
                     parse.append_input('NGT', '0 T')
                     parse.append_input('TEMPERATURE', f'{temp}')
                     parse.write_input(self.path/'pathdata')
@@ -342,7 +488,6 @@ class Analyze_KTN(object):
                     MFPT[ci, cj] = parse.output['MFPTAB']
                     MFPT[cj, ci] = parse.output['MFPTBA']
 
-        print(MFPT)
         #restore original min.A and min.B files
         for f in files_to_modify:
             os.system(f'mv {f}.original {f}')
@@ -434,23 +579,10 @@ class Analyze_KTN(object):
 
         return tJI
 
-    def check_mfpt_equivalence(self, pi, commpi, mfpt):
-        N = len(self.communities)
-        tJI = np.zeros((N,N))
-        for i in range(N):
-            for j in range(N):
-                ci = np.array(self.communities[i+1]) - 1
-                cj = np.array(self.communities[j+1]) - 1
-                numInJ = len(cj)
-                tJI[j][i] = np.ones((1,numInJ))@ mfpt[cj,:][:,ci] @ pi[ci] / commpi[i]
-                tJI[j][i] -= pi[cj] @ mfpt[cj,:][:,cj] @ pi[cj] / (commpi[j])**2
-
-        return tJI
-
     def construct_coarse_rate_matrix_from_MFPTs(self, temp, GT=False):
         """ Calculate a rate matrix using  MFPTs between communities."""
         if self.K is None:
-            logpi, Kmat = self.read_ktn_info(f'T{temp:.2f}', log=True)
+            logpi, Kmat = read_ktn_info(f'T{temp:.2f}', log=True)
             pi = np.exp(logpi)
             self.K = Kmat
             self.pi = pi/pi.sum()
@@ -467,7 +599,7 @@ class Analyze_KTN(object):
         matrix_of_ones = np.ones((N,1))@np.ones((1,N))
         #R_MFPT = inv(MFPT)@(inv(D_N) - matrix_of_ones)
         R_MFPT = spla.solve(mfpt,np.diag(1.0/self.commpi) - matrix_of_ones)
-        self.check_detailed_balance(np.log(self.commpi), R_MFPT)
+        check_detailed_balance(np.log(self.commpi), R_MFPT)
         return R_MFPT
 
     def get_free_energies_from_rates(self, R, thresh, temp, kB=1.0, planck=1.0):
@@ -541,41 +673,6 @@ class Analyze_KTN(object):
         df['itz'] = 1.0
         df.to_csv(self.path/f'ts.data.T{temp:.3f}',header=False, index=False, sep=' ')
 
-    def calc_eigenvectors(self, K, k, which_eig='SM', norm=False):
-        # calculate k dominant eigenvectors and eigenvalues of sparse matrix
-        # using the implictly restarted Arnoldi method
-        evals, evecs = eigs(K, k, which=which_eig)
-        evecs = np.transpose(evecs)
-        evecs = np.array([evec for _,evec in sorted(zip(list(evals),list(evecs)),
-                                 key=lambda pair: pair[0], reverse=True)],dtype=float)
-        evals = np.array(sorted(list(evals),reverse=True),dtype=float)
-        if norm:
-            row_sums = evecs.sum(axis=1)
-            evecs = evecs / row_sums[:, np.newaxis] 
-        return evals, evecs
-    
-    def construct_transition_matrix(self, K, tau_lag):
-        """ Return column-stochastic transition matrix T = expm(K*tau).
-        Columns sum to 1. """
-        T = expm(tau_lag*K)
-        for x in np.sum(T, axis=0):
-            #assert( abs(x - 1.0) < 1.0E-10) 
-            print(f'Transition matrix is not column-stochastic at' \
-                  f'tau={tau_lag}')
-        return T
-
-    def get_timescales(self, K, m, tau_lag):
-        """ Return characteristic timescales obtained from the m dominant 
-        eigenvalues of the transition matrix constructed from K at lag time
-        tau_lag."""
-        T = self.construct_transition_matrix(K, tau_lag)
-        evals, evecs = self.calc_eigenvectors(T, m, which_eig='LM')
-        char_times = np.zeros((np.shape(evals)[0]),dtype=float)
-        # note that we ignore the zero eigenvalue, associated with
-        # infinite time (stationary distribution)
-        for i, eigval in enumerate(evals[1:]):
-            char_times[i+1] = -tau_lag/np.log(eigval)
-        return char_times
 
     def get_timescale_error(self, m, K, R):
         """ Calculate the ith timescale error for i in {1,2,...m} of a
@@ -601,41 +698,13 @@ class Analyze_KTN(object):
         if m >= ncomms:
             raise ValueError('The number of dominant eigenvectors must be' \
                              'less than the number of communities.')
-        Kevals, Kevecs = self.calc_eigenvectors(K, m, which_eig='SM')
-        Revals, Revecs = self.calc_eigenvectors(R, m, which_eig='SM')
+        Kevals, Kevecs = calc_eigenvectors(K, m, which_eig='SM')
+        Revals, Revecs = calc_eigenvectors(R, m, which_eig='SM')
         #the 0th eigenvalue corresponds to infinite time
         Ktimescales = -1./Kevals[1:]
         Rtimescales = -1./Revals[1:]
         timescale_errors = np.abs(Rtimescales - Ktimescales)
         return timescale_errors
-
-    def calculate_spectral_error(self, m, Rs, labels):
-        """ Calculate spectral error, where m is the number of dominant
-        eigenvalues in both the reduced and original transition networks, as a
-        function of lag time. Plots the decay. """
-
-        tau_lags = np.logspace(-4, 4, 1000)
-        colors = sns.color_palette("BrBG", 5)
-        colors = [colors[0], colors[-1]]
-        fig, ax = plt.subplots()
-
-        for j,R in enumerate(Rs):
-            spectral_errors = np.zeros(tau_lags.shape)
-            for i, tau in enumerate(tau_lags):
-                T = self.construct_transition_matrix(R, tau)
-                Tevals, Tevecs = self.calc_eigenvectors(T, m+1, which_eig='LM')
-                # compare m+1 th eigenvalue (first fast eigenvalue) to slowest
-                # eigenmodde
-                spectral_errors[i] = Tevals[m]/Tevals[1]
-            ax.plot(tau_lags, spectral_errors, label=labels[j], color=colors[j])
-
-        plt.xlabel(r'$\tau$')
-        plt.ylabel(r'$\eta(\tau)$')
-        plt.yscale('log')
-        plt.legend()
-        plt.title('3h_pot, G=1.5, T=0.60')
-        fig.tight_layout()
-
 
     def calculate_eigenfunction_error(self, m, K, R):
         """ Calculate the ith eigenvector approximation error for i in {1, 2,
@@ -648,8 +717,8 @@ class Analyze_KTN(object):
         if m >= ncomms:
             raise ValueError('The number of dominant eigenvectors must be' \
                              'less than the number of communities.')
-        Kevals, Kevecs = self.calc_eigenvectors(K, m, which_eig='SM')
-        Revals, Revecs = self.calc_eigenvectors(R, m, which_eig='SM')
+        Kevals, Kevecs = calc_eigenvectors(K, m, which_eig='SM')
+        Revals, Revecs = calc_eigenvectors(R, m, which_eig='SM')
         errors = np.zeros((m,))
         for i in range(0, m):
             print(i)
@@ -659,41 +728,6 @@ class Analyze_KTN(object):
                 coarse_evec = np.tile(Revecs[i, ck-1], len(minima)) #scalar
                 errors[i] += np.linalg.norm(coarse_evec - Kevecs[i, minima])
         return errors
-
-
-    def read_ktn_info(self, suffix, log=False):
-        #read in Daniel's files stat_prob.dat and ts_weights.dat
-
-        logpi = np.loadtxt(self.path/f'stat_prob_{suffix}.dat')
-        pi = np.exp(logpi)
-        nnodes = len(pi)
-        assert(abs(1.0 - np.sum(pi)) < 1.E-10)
-        logk = np.loadtxt(self.path/f'ts_weights_{suffix}.dat', 'float')
-        k = np.exp(logk)
-        tsconns = np.loadtxt(self.path/f'ts_conns_{suffix}.dat', 'int')
-        Kmat = np.zeros((nnodes, nnodes))
-        for i in range(tsconns.shape[0]):
-            Kmat[tsconns[i,1]-1, tsconns[i,0]-1] = k[2*i]
-            Kmat[tsconns[i,0]-1, tsconns[i,1]-1] = k[2*i+1]
-        #set diagonals
-        for i in range(nnodes):
-            Kmat[i, i] = 0.0
-            Kmat[i, i] = -np.sum(Kmat[:, i])
-        #identify isolated minima (where row of Kmat = 0)
-        #TODO: identify unconnected minima
-        Kmat_nonzero_rows = np.where(~np.all(Kmat==0, axis=1))
-        Kmat_connected = Kmat[np.ix_(Kmat_nonzero_rows[0],
-                                     Kmat_nonzero_rows[0])]
-        pi = pi[Kmat_nonzero_rows]/np.sum(pi[Kmat_nonzero_rows])
-        logpi = np.log(pi)
-        assert(len(pi) == Kmat_connected.shape[0])
-        assert(Kmat_connected.shape[0] == Kmat_connected.shape[1])
-        assert(np.all(np.abs(Kmat_connected@pi)<1.E-10))
-
-        if log:
-            return logpi, Kmat_connected 
-        else:
-            return pi, Kmat_connected
 
     def get_comm_stat_probs(self, logpi, log=True):
         """ Calculate the community stationary probabilities by summing over
@@ -731,55 +765,7 @@ class Analyze_KTN(object):
         else:
             return commpi
 
-    def check_detailed_balance(self, pi, K):
-        """ Check if network satisfies detailed balance condition, which is
-        thatthat :math:`k_{ij} \pi_j = k_{ji} \pi_i` for all :math:`i,j`.
-
-        Parameters
-        ----------
-        pi : list (nnodes,) or (ncomms,)
-            stationary probabilities
-        K : np.ndarray (nnodes, nnodes) or (ncomms, ncomms)
-            inter-minima rate constants in matrix form
-
-        """
-        for i in range(K.shape[0]):
-            for j in range(K.shape[1]):
-                if i < j:
-                    left = K[i,j]*pi[j]
-                    right = K[j,i]*pi[i]
-                    diff = abs(left - right)
-                    if (diff > 1.E-10):
-                        #print(f'Detailed balance not satisfied for i={i}, j={j}')
-                        return False
-
-    @staticmethod
-    def read_communities(commdat):
-        """Read in a single column file called communities.dat where each line
-        is the community ID (zero-indexed) of the minima given by the line
-        number.
-        
-        Parameters
-        ----------
-        commdat : .dat file
-            single-column file containing community IDs of each minimum
-
-        Returns
-        -------
-        communities : dict
-            mapping from community ID (1-indexed) to minima ID (1-indexed)
-        """
-
-        communities = {}
-        with open(commdat, 'r') as f:
-            for minID, line in enumerate(f, 1):
-                groupID =  int(line) + 1
-                if groupID in communities:
-                    communities[groupID].append(minID)
-                else:
-                    communities[groupID] = [minID]
-        return communities
-
+ 
 """Functions that use the Analyze_KTN class to perform useful tasks."""
 
 def compare_HS_LEA(temps, nrgthreshs):
@@ -947,7 +933,7 @@ def calc_mfpt_AB_tom(temps):
         #free energy threshold doesn't matter since we only need K, pi
         ktn = Analyze_KTN('/scratch/dk588/databases/modelA',
                         commdata=f'communities_G1.00_T{temp:.2f}.dat')
-        logpi, Kmat = ktn.read_ktn_info(f'T{temp:.2f}', log=True)
+        logpi, Kmat = read_ktn_info(f'T{temp:.2f}', log=True)
         pi = np.exp(logpi)
         pi = pi/pi.sum()
         minA = np.array([1, 7]) - 1
@@ -979,7 +965,7 @@ def compute_HS_matrices(temp):
     ktn = Analyze_KTN('/scratch/dk588/databases/modelA',
                       commdata=f'communities_G1.00_T{temp:.2f}.dat')
 
-    logpi, Kmat = ktn.read_ktn_info(f'T{temp:.2f}')
+    logpi, Kmat = read_ktn_info(f'T{temp:.2f}')
     Rhs = ktn.construct_coarse_matrix_Hummer_Szabo(temp)
     Rhs_mfpt = ktn.hummer_szabo_from_mfpt(temp)
     return

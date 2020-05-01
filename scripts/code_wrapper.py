@@ -18,23 +18,40 @@ import pandas as pd
 from pathlib import Path
 import subprocess
 
-MAXINA = 5
-MAXINB = 395
 INDEX_OF_KEYWORD_VALUE = 15
 PATHSAMPLE = "/home/dk588/svn/PATHSAMPLE/build/gfortran/PATHSAMPLE"
 disconnectionDPS = "/home/dk588/svn/DISCONNECT/source/disconnectionDPS"
 
+def write_communities(self, communities, commdat):
+    """ Write a single-column file `commdat` where each line is the
+    community ID (zero-indexed) of the minima given by the line
+    number.
+
+    Parameters
+    ----------
+    communities : dict
+        mapping from minima ID (1-indexed) to community ID (1-indexed)
+    commdat : .dat file name
+        file to which to write communitiy assignments (0-indexed)
+
+    """
+    commdat = Path(commdat)
+    if commdat.exists():
+        raise ValueError(f'The file {commdat} already exists. Write to a new file')
+    nnodes = len(communities) #number of keys = number of minima
+    with open(commdat, 'w') as f:
+        for min in range(1, nnodes+1):
+            f.write(f'{np.array(communities[min]) - 1}\n')
+
 class ParsedPathsample(object):
 
-    def __init__(self, pathdata, maxinA=5, maxinB=395, outfile=None):
+    def __init__(self, pathdata, outfile=None):
         self.output = {} #dictionary of output (i.e. temperature, rates)
         self.input = {} #dictionary of PATHSAMPLE keywords
         self.numInA = 0 #number of minima in A
         self.numInB = 0 #number of minima in B
-        self.minA = [] #IDs of minima in A set
-        self.minB = [] #IDs of minima in B set
-        #self.maxinA = maxinA #maximum allowed number of minima in A set
-        #self.maxinB = maxinB #maximum allowed number of minima in B set
+        self.minA = [] #IDs of minima in A set (0-indexed)
+        self.minB = [] #IDs of minima in B set (0-indexed)
         #read in numInA, numInB, minA, minB from min.A and min.B files
         self.path = Path(pathdata).parent.absolute()
         self.parse_minA_and_minB(self.path/'min.A', self.path/'min.B')
@@ -84,10 +101,6 @@ class ParsedPathsample(object):
     def define_A_and_B(self, numInA, numInB, sorted=True, mindata=None):
         """Define an A and B set as a function of the number of minima in A
         and B. """
-        #if numInA > self.maxinA:
-        #    raise ValueError(f'The maximum allowed number of states in A is {self.maxinA}')
-        #if numInB > self.maxinB:
-        #    raise ValueError(f'The maximum allowed number of states in B is {self.maxinB}')
         if sorted:
             #min.A and min.B are already sorted by energy
             #just change numInA and numInB
@@ -124,7 +137,7 @@ class ParsedPathsample(object):
 
     def parse_output(self, outfile):
         """Searches for output of various subroutines of pathsample,
-        including NGT, REGROUPFREE, and DIJKSTRA.
+        including NGT and WAITPDF.
         """
         with open(outfile) as f:
             for line in f:
@@ -155,7 +168,10 @@ class ParsedPathsample(object):
 
     def parse_GT_intermediates(self, outfile):
         """Returns a DataFrame of GT quantities, including branching
-        probabilities and curly T_Ab, after disconnection of sources."""
+        probabilities and curly T_Ab, after disconnection of sources.
+        TODO: debug, right now it does not work
+        """
+        raise NotImplementedError('This function has not been implemented yet.')
 
         regex1 = re.compile('NGT> for (A|B) minimum\s+([0-9]+) ' +
                             '(?:P_{Ba}|P_{Ab})=\s+([0-9.E-]+) and time ' +
@@ -198,10 +214,10 @@ class ParsedPathsample(object):
 
     def parse_dumpgroups(self, mingroupsfile, grouptomin=False):
         """Parse the `minima_groups.{temp}` file outputted by the DUMPGROUPS
-        keyword in PATHSAMPLE. Returns a dictionary mapping minID to groupID.
-        TODO: Write out a single-column index file
-        `communities.dat` specifying the group to which each minimum in
-        min.data belongs."""
+        keyword in PATHSAMPLE. Returns a dictionary mapping minID to groupID
+        (if grouptomin is False), or a dirctionary mapping groupID to minID (if
+        grouptomin is True).
+        Both IDs are 1-indexed."""
 
         communities = {}
         with open(mingroupsfile) as f:
@@ -273,52 +289,6 @@ class ParsedPathsample(object):
         os.system(f"{disconnectionDPS}")
         os.system("evince tree.ps")
 
-    def read_communities(self, commdat):
-        """Read in a single column file called communities.dat where each line
-        is the community ID (zero-indexed) of the minima given by the line
-        numbenumber.
-
-        Parameters
-        ----------
-        commdat : .dat file
-            single-column file containing community IDs of each minimum
-
-        Returns
-        -------
-        communities : dict
-            mapping from community ID (1-indexed) to minima ID (1-indexed)
-        """
-
-        communities = {}
-        with open(commdat, 'r') as f:
-            for minID, line in enumerate(f, 1):
-                groupID =  int(line) + 1
-                if groupID in communities:
-                    communities[groupID].append(minID)
-                else:
-                    communities[groupID] = [minID]
-        return communities
-
-    def write_communities(self, communities, commdat):
-        """ Write a single-column file `commdat` where each line is the
-        communitcommunity ID (zero-indexed) of the minima given by the line
-        number.
-
-        Parameters
-        ----------
-        communities : dict
-            mapping from minima ID (1-indexed) to community ID (1-indexed)
-        commdat : .dat file name
-            file to which to write communitiy assignments (0-indexed)
-
-        """
-        commdat = Path(commdat)
-        if commdat.exists():
-            raise ValueError(f'The file {commdat} already exists. Write to a new file')
-        nnodes = len(communities) #number of keys = number of minima
-        with open(commdat, 'w') as f:
-            for min in range(1, nnodes+1):
-                f.write(f'{np.array(communities[min]) - 1}\n')
 
     def calc_community_MFPTs(self, communities, temp):
         """ Calculate a matrix of MFPTs between communities."""
@@ -846,32 +816,5 @@ def dump_ktn_info_scan(path, temps, nrgthreshs=None):
         else:
             for thresh in nrgthreshs:
                 communities = scan.parse.parse_dumpgroups(scan.path/f'G{thresh:.1f}/minima_groups.{temp:.10f}.G{thresh:.1f}')
-                scan.parse.write_communities(communities,
-                                            scan.path/f'communities_G{thresh:.2f}_T{temp:.2f}.dat')
+                write_communities(communities, scan.path/f'communities_G{thresh:.2f}_T{temp:.2f}.dat')
 
-if __name__=='__main__':
-    #temps = np.arange(0.03, 0.16, 0.01)
-    temps = np.arange(0.03, 1.01, 0.01)
-    temps = [100.0, 90.0, 80.0, 70.0, 60.0, 50.0, 40.0, 30.0, 
-           20.0, 10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 
-           1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]
-    dump_ktn_info_scan('/scratch/dk588/databases/chain/metastable', temps)
-    #numinBs = np.arange(1, 396, 1)
-    #numinAs = np.tile(1, len(numinBs))
-    #parse.sort_A_and_B(parse.path/'min.A.master',parse.path/'min.B.master', parse.path/'min.data')
-    #scan_product_states(numinAs, numinBs, temps)
-    """
-    for temp in temps:
-        suffix = 'regroupfree_ABsize'
-        print(f'CALCULATING TEMPERATURE {temp}')
-        scan = ScanPathsample('./pathdata', suffix=suffix)
-        scan.parse.append_input('TEMPERATURE', temp)
-        nrgthreshs = np.linspace(0.01, 3.0, 100)
-        scan.scan_regroup('REGROUPFREE', nrgthreshs.tolist(), temp)
-        scan.remove_output()
-    """
-    #testDG = ParsedPathsample('/scratch/dk588/databases/3h_pot/pathdata')
-    #testDG.draw_disconnectivity_graph_AB(1.5, 0.6)
-    #test = ParsedPathsample('/scratch/dk588/databases/3h_pot/pathdata')
-    #R = test.construct_coarse_rate_matrix(0.6)
-    #print(R)
