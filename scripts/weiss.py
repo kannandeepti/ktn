@@ -55,9 +55,9 @@ plot_params = {'axes.edgecolor': 'black',
                   'ytick.minor.right':False, 
                   'lines.linewidth':1}
 plt.rcParams.update(plot_params)
-#path = Path('/Users/deepti/Documents/Wales/databases/chain/metastable')
-path = Path('/scratch/dk588/databases/chain/metastable')
-PATHSAMPLE = "/home/dk588/svn/PATHSAMPLE/build/gfortran/PATHSAMPLE"
+path = Path('/Users/deepti/Documents/Wales/databases/chain/metastable')
+#path = Path('/scratch/dk588/databases/chain/metastable')
+#PATHSAMPLE = "/home/dk588/svn/PATHSAMPLE/build/gfortran/PATHSAMPLE"
 
 """Define variables needed to calculate rate as a function of
 temperature."""
@@ -225,11 +225,11 @@ def mfpt_between_states_GT_eigen(i, j, temps):
         os.system(f'mv {f}.original {f}')
 
 
-def compare_weiss_pt(i, j, I, J):
+def compare_weiss_pt(i, j, I, J, approx=False, ax=None):
     """Plot PTAB vs. weiss[min1, min2] to compare, where min1 is a minimum in A
     and min2 is a minimum in B."""
     comm = {0:'A', 1:'I', 2:'B'}
-    ktn = Analyze_KTN('/scratch/dk588/databases/chain/metastable', communities
+    ktn = Analyze_KTN('/Users/deepti/Documents/Wales/databases/chain/metastable', communities
                       = {1:[1,2,3], 2:[4,5,6,7,8], 3:[9,10,11]})
     invT = np.linspace(0.001, 5, 100)
     weissAB = np.zeros_like(invT)
@@ -242,16 +242,87 @@ def compare_weiss_pt(i, j, I, J):
         weissBA[k] = mfpt_weiss[j, i]
         pi = peq(1./invtemp)
         commpi = ktn.get_comm_stat_probs(np.log(pi), log=False)
-        pt = ktn.get_kells_cluster_passage_times(pi, commpi, mfpt_weiss)
+        if approx:
+            pt = ktn.get_approx_kells_cluster_passage_times(pi, commpi, mfpt_weiss)
+        else:
+            pt = ktn.get_kells_cluster_passage_times(pi, commpi, mfpt_weiss)
         PTAB[k] = pt[I,J]
         PTBA[k] = pt[J,I]
+    if ax is None:
+        fig, ax = plt.subplots(figsize=[textwidth_inches/3, textwidth_inches/3])
+    ax.plot(invT, weissAB/PTAB,
+            label=f't$_{{{i}\leftarrow{j}}}$/PT({comm[J]}$\leftarrow${comm[I]})')
+    ax.plot(invT, weissBA/PTBA,
+            label=f't$_{{{j}\leftarrow{i}}}$/PT({comm[J]}$\leftarrow${comm[I]})')
+    ax.set_xlabel('1/T')
+    ax.legend()
+    return ax
+    #fig.tight_layout()
 
-    fig, ax = plt.subplots(figsize=[textwidth_inches/3, textwidth_inches/3])
-    ax.plot(invT, weissAB/PTAB, label=f't({i}{j})/PT({comm[I]}{comm[J]})')
-    ax.plot(invT, weissBA/PTBA, label=f't({j}{i})/PT({comm[J]}{comm[I]})')
-    plt.xlabel('1/T')
-    plt.legend()
+def plot_weiss_PT_comparison_panel():
+    """Compare the mfpt between two states against the full cluster-cluster
+    passage time defined in Kells paper. 3 different examples are shown, one
+    for AB, one for AI, and one that only compares the first term of the
+    passage time which we call theta."""
+
+    fig, (ax, ax2, ax3) = plt.subplots(1, 3, figsize=[textwidth_inches,
+                                                      textwidth_inches/3])
+
+    comm = {0:'A', 1:'I', 2:'B'}
+    ktn = Analyze_KTN('/Users/deepti/Documents/Wales/databases/chain/metastable', communities
+                      = {1:[1,2,3], 2:[4,5,6,7,8], 3:[9,10,11]})
+    invT = np.linspace(0.001, 5, 100)
+    weiss19 = np.zeros_like(invT)
+    weiss91 = np.zeros_like(invT)
+    weiss210 = np.zeros_like(invT)
+    weiss92 = np.zeros_like(invT)
+    weiss15 = np.zeros_like(invT)
+    weiss51 = np.zeros_like(invT)
+    PTAB = np.zeros_like(invT)
+    PTBA= np.zeros_like(invT)
+    PTAI = np.zeros_like(invT)
+    PTIA= np.zeros_like(invT)
+    thetaAB = np.zeros_like(invT)
+    thetaBA= np.zeros_like(invT)
+    for k, invtemp in enumerate(invT):
+        mfpt_weiss = weiss(1./invtemp)
+        weiss19[k] = mfpt_weiss[1, 9]
+        weiss91[k] = mfpt_weiss[9, 1]
+        weiss210[k] = mfpt_weiss[2, 10]
+        weiss92[k] = mfpt_weiss[9, 2]
+        weiss15[k] = mfpt_weiss[1, 5]
+        weiss51[k] = mfpt_weiss[5, 1]
+        pi = peq(1./invtemp)
+        commpi = ktn.get_comm_stat_probs(np.log(pi), log=False)
+        pt = ktn.get_kells_cluster_passage_times(pi, commpi, mfpt_weiss)
+        PTAB[k] = pt[0,2]
+        PTBA[k] = pt[2,0]
+        PTAI[k] = pt[0,1]
+        PTIA[k] = pt[1,0]
+        theta = ktn.get_approx_kells_cluster_passage_times(pi, commpi, mfpt_weiss)
+        thetaAB[k] = theta[0,2]
+        thetaBA[k] = theta[2,0]
+    #plot t(2<->10)/theta(A<->B)
+    ax.plot(invT, weiss19/thetaAB, 
+            label=r'$t_{2\leftarrow 10}/{\theta}_{A\leftarrow B}$')
+    ax.plot(invT, weiss91/thetaBA, 
+            label=r'$t_{10\leftarrow 2}/{\theta}_{B\leftarrow A}$')
+    ax.legend()
+    #plot t(3<->10)/PT(A<->B)
+    ax2.plot(invT, weiss210/PTAB,
+            label=r'$t_{3\leftarrow 11}/{\bf t}^{c}_{A\leftarrow B}$')
+    ax2.plot(invT, weiss92/PTBA,
+            label=r'$t_{10\leftarrow 3}/{\bf t}^{c}_{B\leftarrow A}$')
+    ax2.set_xlabel('1/T')
+    ax2.legend()
+    #plot t(2<->6)/PT(A<->I)
+    ax3.plot(invT, weiss15/PTAI,
+            label=r'$t_{2\leftarrow 6}/{\bf t}^{c}_{A\leftarrow I}$')
+    ax3.plot(invT, weiss51/PTIA,
+            label=r'$t_{6\leftarrow 2}/{\bf t}^{c}_{I\leftarrow A}$')
+    ax3.legend()
     fig.tight_layout()
+    plt.savefig('plots/weiss_PT_mfpt_approx_panel.pdf')
 
 def plot_weiss_landscape_mfpt_benchmark():
     """Plot energy of minima and transition states as a function of the 11
